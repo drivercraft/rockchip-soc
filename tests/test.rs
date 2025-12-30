@@ -7,15 +7,20 @@ extern crate bare_test;
 
 #[bare_test::tests]
 mod tests {
-    use bare_test::println;
+    use bare_test::{mem::iomap, println};
     use log::info;
+    use rockchip_soc::rk3588::*;
 
     #[test]
     fn it_works() {
-        info!("This is a test log message.");
-        let a = 2;
-        let b = 2;
-        assert_eq!(a + b, 4);
-        println!("test passed!");
+        let cru3588 = 0xfd7c0000usize;
+        let sys_grf = Cru::grf_mmio_ls()[0];
+
+        let base = iomap(cru3588.into(), 0x5c000);
+        let sys_grf = iomap(sys_grf.base.into(), sys_grf.size);
+
+        let mut cru = Cru::new(base, sys_grf);
+
+        cru.init();
     }
 }

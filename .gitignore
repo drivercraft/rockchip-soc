@@ -1,3 +1,4 @@
 /target
 Cargo.lock
-.bare-test.toml
+.*-schema.json
+.spec-workflow
