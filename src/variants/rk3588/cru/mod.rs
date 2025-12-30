@@ -1,9 +1,17 @@
 use crate::{Mmio, grf::GrfMmio};
 
 mod pll;
+mod consts;
 
 // =============================================================================
-// 常量定义
+// 公开导出
+// =============================================================================
+
+pub use consts::*;
+pub use pll::{PllId, PLL_RATE_TABLE, RK3588_PLL_CLOCKS};
+
+// =============================================================================
+// 内部常量定义
 // =============================================================================
 
 /// MHz 单位
@@ -120,8 +128,8 @@ impl Cru {
         }
 
         // Step 3: 假设 PLL 已由 bootloader 正确配置
-        self.cpll_hz = CPLL_HZ;
-        self.gpll_hz = GPLL_HZ;
+        self.cpll_hz = CPLL_HZ as u64;
+        self.gpll_hz = GPLL_HZ as u64;
 
         log::info!("✓ CRU@{:x}: Clock configuration verified", self.base);
     }

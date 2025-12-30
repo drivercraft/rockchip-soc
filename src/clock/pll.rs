@@ -117,7 +117,7 @@ pub struct PllClock {
     pub pll_flags: u32,
 
     /// PLL 速率表指针
-    pub rate_table: Option<&'static PllRateTable>,
+    pub rate_table: &'static [PllRateTable],
 
     /// 模式掩码
     pub mode_mask: u32,
@@ -146,7 +146,7 @@ impl PllClock {
         lock_shift: u32,
         pll_type: RockchipPllType,
         pll_flags: u32,
-        rate_table: Option<&'static PllRateTable>,
+        rate_table: &'static [PllRateTable],
         mode_mask: u32,
     ) -> Self {
         Self {

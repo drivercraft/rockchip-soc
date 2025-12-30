@@ -12,7 +12,7 @@ pub enum PllId {
     V0PLL,
     AUPLL,
     PPLL,
-    PLL_COUNT,
+    _Len,
 }
 
 pub const PLL_RATE_TABLE: &[PllRateTable] = &[
@@ -38,114 +38,114 @@ pub const PLL_RATE_TABLE: &[PllRateTable] = &[
 /// RK3588 PLL 时钟配置
 ///
 /// 参考 u-boot-orangepi/drivers/clk/rockchip/clk_rk3588.c
-pub const RK3588_PLL_CLOCKS: [PllClock; PllId::PLL_COUNT as usize] = [
+pub const RK3588_PLL_CLOCKS: [PllClock; PllId::_Len as usize] = [
     // B0PLL - BIGCORE0 PLL
     PllClock::new(
         PllId::B0PLL as u32,
-        0x50000,                           // RK3588_B0_PLL_CON(0) = RK3588_BIGCORE0_CRU_BASE + 0*4
-        0x50280,                           // RK3588_B0_PLL_MODE_CON = RK3588_BIGCORE0_CRU_BASE + 0x280
-        0,                                 // mode_shift
-        15,                                // lock_shift
+        0x50000, // RK3588_B0_PLL_CON(0) = RK3588_BIGCORE0_CRU_BASE + 0*4
+        0x50280, // RK3588_B0_PLL_MODE_CON = RK3588_BIGCORE0_CRU_BASE + 0x280
+        0,       // mode_shift
+        15,      // lock_shift
         RockchipPllType::PllRk3588,
         crate::clock::pll::pll_flags::PLL_RK3588,
-        Some(PLL_RATE_TABLE),
-        0x3,                               // mode_mask: 2 bits
+        PLL_RATE_TABLE,
+        0x3, // mode_mask: 2 bits
     ),
     // B1PLL - BIGCORE1 PLL
     PllClock::new(
         PllId::B1PLL as u32,
-        0x52020,                           // RK3588_B1_PLL_CON(8) = RK3588_BIGCORE1_CRU_BASE + 8*4
-        0x52280,                           // RK3588_B1_PLL_MODE_CON = RK3588_BIGCORE1_CRU_BASE + 0x280
-        0,                                 // mode_shift
-        15,                                // lock_shift
+        0x52020, // RK3588_B1_PLL_CON(8) = RK3588_BIGCORE1_CRU_BASE + 8*4
+        0x52280, // RK3588_B1_PLL_MODE_CON = RK3588_BIGCORE1_CRU_BASE + 0x280
+        0,       // mode_shift
+        15,      // lock_shift
         RockchipPllType::PllRk3588,
         crate::clock::pll::pll_flags::PLL_RK3588,
-        Some(PLL_RATE_TABLE),
-        0x3,                               // mode_mask: 2 bits
+        PLL_RATE_TABLE,
+        0x3, // mode_mask: 2 bits
     ),
     // LPLL - DSU PLL
     PllClock::new(
         PllId::LPLL as u32,
-        0x58040,                           // RK3588_LPLL_CON(16) = RK3588_DSU_CRU_BASE + 16*4
-        0x58280,                           // RK3588_LPLL_MODE_CON = RK3588_DSU_CRU_BASE + 0x280
-        0,                                 // mode_shift
-        15,                                // lock_shift
+        0x58040, // RK3588_LPLL_CON(16) = RK3588_DSU_CRU_BASE + 16*4
+        0x58280, // RK3588_LPLL_MODE_CON = RK3588_DSU_CRU_BASE + 0x280
+        0,       // mode_shift
+        15,      // lock_shift
         RockchipPllType::PllRk3588,
         crate::clock::pll::pll_flags::PLL_RK3588,
-        Some(PLL_RATE_TABLE),
-        0x3,                               // mode_mask: 2 bits
+        PLL_RATE_TABLE,
+        0x3, // mode_mask: 2 bits
     ),
     // V0PLL - Video PLL 0
     PllClock::new(
         PllId::V0PLL as u32,
-        0x160,                             // RK3588_PLL_CON(88) = 88*4
-        0x280,                             // RK3588_MODE_CON0
-        4,                                 // mode_shift
-        15,                                // lock_shift
+        0x160, // RK3588_PLL_CON(88) = 88*4
+        0x280, // RK3588_MODE_CON0
+        4,     // mode_shift
+        15,    // lock_shift
         RockchipPllType::PllRk3588,
         crate::clock::pll::pll_flags::PLL_RK3588,
-        Some(PLL_RATE_TABLE),
-        0x3,                               // mode_mask: 2 bits
+        PLL_RATE_TABLE,
+        0x3, // mode_mask: 2 bits
     ),
     // AUPLL - Audio PLL
     PllClock::new(
         PllId::AUPLL as u32,
-        0x180,                             // RK3588_PLL_CON(96) = 96*4
-        0x280,                             // RK3588_MODE_CON0
-        6,                                 // mode_shift
-        15,                                // lock_shift
+        0x180, // RK3588_PLL_CON(96) = 96*4
+        0x280, // RK3588_MODE_CON0
+        6,     // mode_shift
+        15,    // lock_shift
         RockchipPllType::PllRk3588,
         crate::clock::pll::pll_flags::PLL_RK3588,
-        Some(PLL_RATE_TABLE),
-        0x3,                               // mode_mask: 2 bits
+        PLL_RATE_TABLE,
+        0x3, // mode_mask: 2 bits
     ),
     // CPLL - Center PLL
     PllClock::new(
         PllId::CPLL as u32,
-        0x1a0,                             // RK3588_PLL_CON(104) = 104*4
-        0x280,                             // RK3588_MODE_CON0
-        8,                                 // mode_shift
-        15,                                // lock_shift
+        0x1a0, // RK3588_PLL_CON(104) = 104*4
+        0x280, // RK3588_MODE_CON0
+        8,     // mode_shift
+        15,    // lock_shift
         RockchipPllType::PllRk3588,
         crate::clock::pll::pll_flags::PLL_RK3588,
-        Some(PLL_RATE_TABLE),
-        0x3,                               // mode_mask: 2 bits
+        PLL_RATE_TABLE,
+        0x3, // mode_mask: 2 bits
     ),
     // GPLL - General PLL
     PllClock::new(
         PllId::GPLL as u32,
-        0x1c0,                             // RK3588_PLL_CON(112) = 112*4
-        0x280,                             // RK3588_MODE_CON0
-        2,                                 // mode_shift
-        15,                                // lock_shift
+        0x1c0, // RK3588_PLL_CON(112) = 112*4
+        0x280, // RK3588_MODE_CON0
+        2,     // mode_shift
+        15,    // lock_shift
         RockchipPllType::PllRk3588,
         crate::clock::pll::pll_flags::PLL_RK3588,
-        Some(PLL_RATE_TABLE),
-        0x3,                               // mode_mask: 2 bits
+        PLL_RATE_TABLE,
+        0x3, // mode_mask: 2 bits
     ),
     // NPLL - New PLL
     PllClock::new(
         PllId::NPLL as u32,
-        0x1e0,                             // RK3588_PLL_CON(120) = 120*4
-        0x280,                             // RK3588_MODE_CON0
-        0,                                 // mode_shift
-        15,                                // lock_shift
+        0x1e0, // RK3588_PLL_CON(120) = 120*4
+        0x280, // RK3588_MODE_CON0
+        0,     // mode_shift
+        15,    // lock_shift
         RockchipPllType::PllRk3588,
         crate::clock::pll::pll_flags::PLL_RK3588,
-        Some(PLL_RATE_TABLE),
-        0x3,                               // mode_mask: 2 bits
+        PLL_RATE_TABLE,
+        0x3, // mode_mask: 2 bits
     ),
     // PPLL - PMU PLL (在 PHP_CRU 基地址)
     PllClock::new(
         PllId::PPLL as u32,
-        0x8200,                            // RK3588_PMU_PLL_CON(128) = RK3588_PHP_CRU_BASE + 128*4
-        0x280,                             // RK3588_MODE_CON0
-        10,                                // mode_shift
-        15,                                // lock_shift
+        0x8200, // RK3588_PMU_PLL_CON(128) = RK3588_PHP_CRU_BASE + 128*4
+        0x280,  // RK3588_MODE_CON0
+        10,     // mode_shift
+        15,     // lock_shift
         RockchipPllType::PllRk3588,
         crate::clock::pll::pll_flags::PLL_RK3588,
-        Some(PLL_RATE_TABLE),
-        0x3,                               // mode_mask: 2 bits
+        PLL_RATE_TABLE,
+        0x3, // mode_mask: 2 bits
     ),
 ];
 
