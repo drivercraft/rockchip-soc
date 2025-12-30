@@ -2,3 +2,4 @@
 Cargo.lock
 .*-schema.json
 .spec-workflow
+.uboot.toml
