@@ -138,7 +138,7 @@ pub const RK3588_PLL_CLOCKS: [PllClock; PllId::PLL_COUNT as usize] = [
     // PPLL - PMU PLL (在 PHP_CRU 基地址)
     PllClock::new(
         PllId::PPLL as u32,
-        0x80200,                           // RK3588_PMU_PLL_CON(128) = RK3588_PHP_CRU_BASE + 128*4
+        0x8200,                            // RK3588_PMU_PLL_CON(128) = RK3588_PHP_CRU_BASE + 128*4
         0x280,                             // RK3588_MODE_CON0
         10,                                // mode_shift
         15,                                // lock_shift
