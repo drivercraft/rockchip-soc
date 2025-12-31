@@ -9,6 +9,8 @@
 1. **[PLL.md](PLL.md)** - PLL 时钟配置完整说明
 2. **[TEST_REPORT.md](TEST_REPORT.md)** - PLL 配置测试报告
 3. **[CRU_INIT_VERIFICATION.md](CRU_INIT_VERIFICATION.md)** - CRU 初始化验证
+4. **[PLL_READING.md](PLL_READING.md)** - PLL 寄存器读取实现
+5. **[REFACTOR_2025-12-31.md](REFACTOR_2025-12-31.md)** - Cru 模块整合重构
 
 **注意**: `PLL_ID_MAPPING.md` 已过时,因为 PllId 优化已消除双重 ID 系统的混淆。详见 [PLL.md#设计亮点](PLL.md#设计亮点)。
 
@@ -48,6 +50,17 @@
 
 **适合**: 需要验证实现正确性或了解测试覆盖的开发者
 
+### PLL_READING.md - PLL 寄存器读取实现
+
+包含内容:
+- PLL 寄存器读取的完整实现
+- 与 u-boot `rk3588_pll_get_rate()` 的对比
+- 频率计算公式详解 (整数和小数分频)
+- 单元测试覆盖说明
+- 使用示例和验证方法
+
+**适合**: 需要理解或调试 PLL 频率读取的开发者
+
 ## 🚀 快速开始
 
 ### 我想要...
@@ -60,6 +73,8 @@
 | 理解 PllId 设计 | [PLL.md](PLL.md#设计亮点) |
 | 了解为什么只需一个 ID | [PLL.md](PLL.md#设计亮点) |
 | 验证实现正确性 | [TEST_REPORT.md](TEST_REPORT.md) |
+| 理解 PLL 寄存器读取 | [PLL_READING.md](PLL_READING.md) |
+| 读取并验证 PLL 频率 | [PLL_READING.md](PLL_READING.md#rust-实现) |
 
 ## ✨ 设计亮点
 
@@ -134,6 +149,8 @@ test result: ok. 21 passed; 0 failed
    - RK3588 TRM (Technical Reference Manual)
 
 ---
-**文档版本**: 2.0
+**文档版本**: 2.1
 **最后更新**: 2025-12-31
-**主要变更**: PllId 优化为从 1 开始,消除 ID 混淆
+**主要变更**:
+- v2.1: 新增 PLL_READING.md 文档,说明 PLL 寄存器读取实现
+- v2.0: PllId 优化为从 1 开始,消除 ID 混淆

@@ -8,6 +8,7 @@ mod pll;
 // =============================================================================
 
 pub use consts::*;
+pub use pll::*;
 
 // =============================================================================
 // 内部常量定义
@@ -18,6 +19,12 @@ const MHZ: u64 = 1_000_000;
 
 /// clksel_con 寄存器基址偏移
 const CLKSEL_CON_OFFSET: usize = 0x0300;
+
+/// PLL 模式掩码
+const PLL_MODE_MASK: u32 = 0x3;
+
+/// PLLCON 寄存器偏移量
+const RK3588_PLLCON: fn(u32) -> u32 = |i: u32| i * 0x4;
 
 /// 计算 clksel_con 寄存器偏移
 #[must_use]
@@ -104,8 +111,11 @@ impl Cru {
         } else {
             0
         };
-        debug!("  - DIV: {} (factor: {}, output: {}MHz)",
-            bus_root_div, bus_root_div_factor, bus_root_rate / MHZ
+        debug!(
+            "  - DIV: {} (factor: {}, output: {}MHz)",
+            bus_root_div,
+            bus_root_div_factor,
+            bus_root_rate / MHZ
         );
 
         // u-boot 配置验证
@@ -115,7 +125,8 @@ impl Cru {
         if bus_root_sel != ACLK_BUS_ROOT_SEL_GPLL {
             log::warn!(
                 "⚠ CRU@{:x}: ACLK_BUS_ROOT source mismatch! u-boot: GPLL(0), current: {}",
-                self.base, bus_root_sel
+                self.base,
+                bus_root_sel
             );
         } else {
             debug!("✓ ACLK_BUS_ROOT source matches u-boot (GPLL)");
@@ -124,7 +135,9 @@ impl Cru {
         if bus_root_div != expected_div as u32 {
             log::warn!(
                 "⚠ CRU@{:x}: ACLK_BUS_ROOT div mismatch! u-boot: {}, current: {}",
-                self.base, expected_div, bus_root_div
+                self.base,
+                expected_div,
+                bus_root_div
             );
         } else {
             debug!("✓ ACLK_BUS_ROOT div matches u-boot ({})", expected_div);
@@ -144,8 +157,7 @@ impl Cru {
 
         debug!(
             "CRU@{:x}: clksel_con[9] (ACLK_TOP): 0x{:08x}",
-            self.base,
-            clksel_9
+            self.base, clksel_9
         );
         debug!("  - S400_SEL: {} (0=400MHz, 1=200MHz)", s400_sel);
         debug!("  - S200_SEL: {} (0=200MHz, 1=100MHz)", s200_sel);
@@ -153,7 +165,8 @@ impl Cru {
         if s400_sel != ACLK_TOP_S400_SEL_400M {
             log::warn!(
                 "⚠ CRU@{:x}: ACLK_TOP_S400 mismatch! u-boot: 0 (400MHz), current: {}",
-                self.base, s400_sel
+                self.base,
+                s400_sel
             );
         } else {
             debug!("✓ ACLK_TOP_S400 matches u-boot (400MHz)");
@@ -162,30 +175,140 @@ impl Cru {
         if s200_sel != ACLK_TOP_S200_SEL_200M {
             log::warn!(
                 "⚠ CRU@{:x}: ACLK_TOP_S200 mismatch! u-boot: 0 (200MHz), current: {}",
-                self.base, s200_sel
+                self.base,
+                s200_sel
             );
         } else {
             debug!("✓ ACLK_TOP_S200 matches u-boot (200MHz)");
         }
 
         // ========================================================================
-        // 3. PLL 频率验证
+        // 3. 读取并验证 PLL 频率
         // u-boot 通过 rockchip_pll_set_rate() 配置:
         // - CPLL: CPLL_HZ (1500MHz)
         // - GPLL: GPLL_HZ (1188MHz)
-        // - PPLL: PPLL_HZ (1100MHz, 如果启用 PCI)
-        //
-        // 注意: 此处仅记录预期值，实际 PLL 频率需要通过 PLL 寄存器计算
         // ========================================================================
-        self.cpll_hz = CPLL_HZ as u64;
-        self.gpll_hz = GPLL_HZ as u64;
+        let cpll_actual = self.read_pll_rate(PllId::CPLL);
+        let gpll_actual = self.read_pll_rate(PllId::GPLL);
 
-        debug!("PLL expected rates (from u-boot):");
-        debug!("  - CPLL: {}MHz", CPLL_HZ / (MHZ as u32));
-        debug!("  - GPLL: {}MHz", GPLL_HZ / (MHZ as u32));
-        debug!("  - PPLL: {}MHz (if PCI enabled)", PPLL_HZ / (MHZ as u32));
+        // 保存实际读取到的频率
+        self.cpll_hz = cpll_actual;
+        self.gpll_hz = gpll_actual;
 
-        log::info!("✓ CRU@{:x}: Clock configuration verified vs u-boot", self.base);
+        debug!("PLL actual rates (read from registers):");
+        debug!("  - CPLL: {}MHz", cpll_actual / MHZ);
+        debug!("  - GPLL: {}MHz", gpll_actual / MHZ);
+
+        // 验证与 u-boot 预期值的一致性
+        verify_pll_frequency(PllId::CPLL, cpll_actual, CPLL_HZ as u64);
+        verify_pll_frequency(PllId::GPLL, gpll_actual, GPLL_HZ as u64);
+
+        log::info!(
+            "✓ CRU@{:x}: Clock configuration verified vs u-boot",
+            self.base
+        );
+    }
+
+    /// 读取 PLL 实际频率
+    ///
+    /// 参考 u-boot: drivers/clk/rockchip/clk_pll.c:rk3588_pll_get_rate()
+    ///
+    /// # 参数
+    ///
+    /// * `pll_id` - PLL ID
+    ///
+    /// # 返回
+    ///
+    /// PLL 输出频率 (Hz)
+    #[must_use]
+    fn read_pll_rate(&self, pll_id: PllId) -> u64 {
+        let pll_cfg = get_pll(pll_id);
+
+        // 1. 读取 PLL 模式
+        let mode_con = self.read(pll_cfg.mode_offset as usize);
+        let mode_shift = pll_cfg.mode_shift;
+
+        // PPLL (ID=8) 特殊处理: 始终认为是 NORMAL 模式
+        let pll_id_val = pll_id as u32;
+        let mode = if pll_id_val == 8 {
+            pll_mode::PLL_MODE_NORMAL
+        } else {
+            (mode_con & (PLL_MODE_MASK << mode_shift)) >> mode_shift
+        };
+
+        match mode {
+            pll_mode::PLL_MODE_SLOW => {
+                debug!(
+                    "{}[mode_shift={}] is in SLOW mode, returning OSC_HZ",
+                    pll_id.name(),
+                    mode_shift
+                );
+                return OSC_HZ as u64;
+            }
+            pll_mode::PLL_MODE_DEEP => {
+                debug!(
+                    "{}[mode_shift={}] is in DEEP mode, returning 32768Hz",
+                    pll_id.name(),
+                    mode_shift
+                );
+                return 32768;
+            }
+            pll_mode::PLL_MODE_NORMAL => {
+                // 继续读取 PLL 参数
+            }
+            _ => {
+                log::warn!(
+                    "⚠️ {}[mode_shift={}]: unknown mode={}, returning OSC_HZ",
+                    pll_id.name(),
+                    mode_shift,
+                    mode
+                );
+                return OSC_HZ as u64;
+            }
+        }
+
+        // 2. 读取 PLL 参数 (参考 u-boot rk3588_pll_get_rate)
+        // PLLCON0: M (10 bits)
+        let con0 = self.read(pll_cfg.con_offset as usize);
+        let m = (con0 & pllcon0::M_MASK) >> pllcon0::M_SHIFT;
+
+        // PLLCON1: P (6 bits), S (3 bits)
+        let con1 = self.read((pll_cfg.con_offset + RK3588_PLLCON(1)) as usize);
+        let p = (con1 & pllcon1::P_MASK) >> pllcon1::P_SHIFT;
+        let s = (con1 & pllcon1::S_MASK) >> pllcon1::S_SHIFT;
+
+        // PLLCON2: K (16 bits)
+        let con2 = self.read((pll_cfg.con_offset + RK3588_PLLCON(2)) as usize);
+        let k = (con2 & pllcon2::K_MASK) >> pllcon2::K_SHIFT;
+
+        debug!("{}: p={}, m={}, s={}, k={}", pll_id.name(), p, m, s, k);
+
+        // 3. 验证 p 值
+        if p == 0 {
+            log::warn!(
+                "⚠️ PLL[mode_shift={}] has invalid p=0, assuming not configured, returning OSC_HZ",
+                mode_shift
+            );
+            return OSC_HZ as u64;
+        }
+
+        // 4. 计算频率 (参考 u-boot rk3588_pll_get_rate)
+        // rate = OSC_HZ / p * m
+        let mut rate: u64 = (OSC_HZ as u64 / p as u64) * m as u64;
+
+        // 如果有小数分频 k
+        if k != 0 {
+            // frac_rate = OSC_HZ * k / (p * 65536)
+            let frac_rate = (OSC_HZ as u64 * k as u64) / (p as u64 * 65536);
+            rate += frac_rate;
+        }
+
+        // 右移 s 位 (后分频)
+        rate >>= s;
+
+        debug!("{}: calculated rate = {}MHz", pll_id.name(), rate / MHZ);
+
+        rate
     }
 
     /// 写入 clksel_con 寄存器
@@ -246,6 +369,45 @@ impl Cru {
     }
 }
 
+/// 验证 PLL 频率
+///
+/// 对比实际读取的 PLL 频率与 u-boot 配置的预期频率
+///
+/// # 参数
+///
+/// * `pll_id` - PLL ID
+/// * `actual_hz` - 实际读取的频率 (Hz)
+/// * `expected_hz` - 预期频率 (Hz)
+fn verify_pll_frequency(pll_id: PllId, actual_hz: u64, expected_hz: u64) {
+    let diff_hz = if actual_hz > expected_hz {
+        actual_hz - expected_hz
+    } else {
+        expected_hz - actual_hz
+    };
+
+    // 允许 0.1% 的误差
+    let tolerance = expected_hz / 1000;
+
+    if diff_hz <= tolerance {
+        debug!(
+            "✓ {}: {}MHz (expected: {}MHz, diff: {}Hz)",
+            pll_id.name(),
+            actual_hz / MHZ,
+            expected_hz / MHZ,
+            diff_hz
+        );
+    } else {
+        log::warn!(
+            "⚠️ {}: {}MHz (expected: {}MHz, diff: {}Hz, tolerance: {}Hz)",
+            pll_id.name(),
+            actual_hz / MHZ,
+            expected_hz / MHZ,
+            diff_hz,
+            tolerance
+        );
+    }
+}
+
 // =============================================================================
 // 单元测试
 // =============================================================================
@@ -263,7 +425,10 @@ mod tests {
         //       = (1188 + 300 - 1) / 300 = 4
         //       写入: div - 1 = 3 (因为 DIV_TO_RATE = rate / (div + 1))
         let expected_div_reg = ((GPLL_HZ as u64) + (300 * MHZ) - 1) / (300 * MHZ) - 1;
-        assert_eq!(expected_div_reg, 3, "ACLK_BUS_ROOT div should be 3 (factor=4)");
+        assert_eq!(
+            expected_div_reg, 3,
+            "ACLK_BUS_ROOT div should be 3 (factor=4)"
+        );
 
         // ACLK_TOP_S400: 0 = 400MHz
         let expected_s400_sel = ACLK_TOP_S400_SEL_400M;
@@ -320,5 +485,67 @@ mod tests {
         //   预期值 = 0x00000000
         let expected_clksel_9 = (0 << 8) | (0 << 6);
         assert_eq!(expected_clksel_9, 0);
+    }
+
+    /// 测试 PLL 频率计算公式
+    ///
+    /// 验证从寄存器值计算 PLL 输出频率的公式
+    #[test]
+    fn test_pll_rate_calculation() {
+        // 测试 GPLL 1188MHz: p=2, m=198, s=1, k=0
+        // rate = ((24MHz / 2) * 198) >> 1 = 1188MHz
+        let fin = OSC_HZ as u64;
+        let rate = ((fin / 2) * 198) >> 1;
+        assert_eq!(rate, 1188 * (MHZ as u64));
+
+        // 测试 CPLL 1500MHz: p=2, m=250, s=1, k=0
+        // rate = ((24MHz / 2) * 250) >> 1 = 1500MHz
+        let rate = ((fin / 2) * 250) >> 1;
+        assert_eq!(rate, 1500 * (MHZ as u64));
+
+        // 测试小数分频 786.432MHz: p=2, m=262, s=2, k=9437
+        // rate = ((24MHz / 2) * 262 + (24MHz * 9437) / (2 * 65536)) >> 2
+        let p = 2u64;
+        let m = 262u64;
+        let s = 2u32;
+        let k = 9437u64;
+
+        let mut rate = (fin / p) * m;
+        let frac_rate = (fin * k) / (p * 65536);
+        rate += frac_rate;
+        rate >>= s;
+
+        // 由于整数除法精度限制,结果为 786431991 Hz
+        assert_eq!(rate, 786_431_991);
+    }
+
+    /// 测试 PLL 模式掩码和常量
+    #[test]
+    fn test_pll_mode_constants() {
+        // 验证模式常量
+        assert_eq!(pll_mode::PLL_MODE_SLOW, 0);
+        assert_eq!(pll_mode::PLL_MODE_NORMAL, 1);
+        assert_eq!(pll_mode::PLL_MODE_DEEP, 2);
+
+        // 验证模式掩码
+        assert_eq!(PLL_MODE_MASK, 0x3);
+    }
+
+    /// 测试 PLL 寄存器位掩码
+    #[test]
+    fn test_pll_register_masks() {
+        // PLLCON0: M (10 bits)
+        assert_eq!(pllcon0::M_MASK, 0x3ff);
+        assert_eq!(pllcon0::M_SHIFT, 0);
+
+        // PLLCON1: P (6 bits), S (3 bits)
+        assert_eq!(pllcon1::P_MASK, 0x3f);
+        assert_eq!(pllcon1::P_SHIFT, 0);
+        assert_eq!(pllcon1::S_MASK, 0x7 << 6);
+        assert_eq!(pllcon1::S_SHIFT, 6);
+
+        // PLLCON2: K (16 bits)
+        assert_eq!(pllcon2::K_MASK, 0xffff);
+        assert_eq!(pllcon2::K_SHIFT, 0);
     }
 }

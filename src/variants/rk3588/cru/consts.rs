@@ -646,3 +646,51 @@ pub mod pmu_clk_sel3 {
     pub const CLK_I2C_SEL_200M: u32 = 0;
     pub const CLK_I2C_SEL_100M: u32 = 1;
 }
+
+// ============================================================================
+// PLL 寄存器位域定义 (RK3588)
+// ============================================================================
+
+/// PLL 模式定义
+pub mod pll_mode {
+    /// 慢速模式 - 直接输出 OSC 时钟
+    pub const PLL_MODE_SLOW: u32 = 0;
+    /// 正常模式 - PLL 正常工作
+    pub const PLL_MODE_NORMAL: u32 = 1;
+    /// 深度模式 - 低功耗模式
+    pub const PLL_MODE_DEEP: u32 = 2;
+}
+
+/// RK3588 PLL 配置寄存器 0 (PLLCON0)
+pub mod pllcon0 {
+    /// M 分频系数 (反馈分频)
+    pub const M_SHIFT: u32 = 0;
+    pub const M_MASK: u32 = 0x3ff << M_SHIFT;  // 10 bits
+}
+
+/// RK3588 PLL 配置寄存器 1 (PLLCON1)
+pub mod pllcon1 {
+    /// P 分频系数 (预分频)
+    pub const P_SHIFT: u32 = 0;
+    pub const P_MASK: u32 = 0x3f << P_SHIFT;  // 6 bits
+
+    /// S 分频系数 (后分频)
+    pub const S_SHIFT: u32 = 6;
+    pub const S_MASK: u32 = 0x7 << S_SHIFT;  // 3 bits
+
+    /// PLL 掉电使能
+    pub const PWRDOWN: u32 = 1 << 13;
+}
+
+/// RK3588 PLL 配置寄存器 2 (PLLCON2)
+pub mod pllcon2 {
+    /// K 小数分频系数
+    pub const K_SHIFT: u32 = 0;
+    pub const K_MASK: u32 = 0xffff << K_SHIFT;  // 16 bits
+}
+
+/// RK3588 PLL 配置寄存器 6 (PLLCON6)
+pub mod pllcon6 {
+    /// PLL 锁定状态
+    pub const LOCK_STATUS: u32 = 1 << 15;
+}
