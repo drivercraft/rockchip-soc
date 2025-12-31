@@ -125,7 +125,7 @@ macro_rules! pll {
 /// - PPLL: PMU PLL
 ///
 /// 注意: 数组顺序必须与 PllId 枚举顺序一致
-pub const RK3588_PLL_CLOCKS: [PllClock; PllId::_Len as usize - 1] = [
+const RK3588_PLL_CLOCKS: [PllClock; PllId::_Len as usize - 1] = [
     // [0] B0PLL - BIGCORE0 PLL (偏移 0x50000)
     pll!(B0PLL, b0_pll_con(0), RK3588_B0_PLL_MODE_CON, 0, 15, 0),
     // [1] B1PLL - BIGCORE1 PLL (偏移 0x52000)
@@ -177,7 +177,6 @@ const fn pll_rate(rate: u64, p: u32, m: u32, s: u32, k: u32) -> PllRateTable {
 /// # 返回
 ///
 /// 返回对应 PLL 的配置引用
-#[must_use]
 pub const fn get_pll(id: PllId) -> &'static PllClock {
     &RK3588_PLL_CLOCKS[id as usize - 1]
 }
@@ -258,22 +257,23 @@ mod tests {
     #[test]
     fn test_pll_count() {
         // RK3588 应该有 9 个 PLL
-        assert_eq!(RK3588_PLL_CLOCKS.len(), PllId::_Len as usize);
+        // PllId 从 1 开始,所以 _Len = 10 (1-9 + _Len)
         assert_eq!(RK3588_PLL_CLOCKS.len(), 9);
+        assert_eq!(PllId::_Len as usize, 10);
     }
 
     #[test]
     fn test_pll_ids() {
-        // 验证 PLL ID 顺序
-        assert_eq!(PllId::B0PLL as usize, 0);
-        assert_eq!(PllId::B1PLL as usize, 1);
-        assert_eq!(PllId::LPLL as usize, 2);
-        assert_eq!(PllId::CPLL as usize, 3);
-        assert_eq!(PllId::GPLL as usize, 4);
-        assert_eq!(PllId::NPLL as usize, 5);
-        assert_eq!(PllId::V0PLL as usize, 6);
-        assert_eq!(PllId::AUPLL as usize, 7);
-        assert_eq!(PllId::PPLL as usize, 8);
+        // 验证 PLL ID 值 (匹配设备树绑定 rk3588-cru.h)
+        assert_eq!(PllId::B0PLL as usize, 1);
+        assert_eq!(PllId::B1PLL as usize, 2);
+        assert_eq!(PllId::LPLL as usize, 3);
+        assert_eq!(PllId::CPLL as usize, 4);
+        assert_eq!(PllId::GPLL as usize, 5);
+        assert_eq!(PllId::NPLL as usize, 6);
+        assert_eq!(PllId::V0PLL as usize, 7);
+        assert_eq!(PllId::AUPLL as usize, 8);
+        assert_eq!(PllId::PPLL as usize, 9);
     }
 
     #[test]
@@ -312,7 +312,7 @@ mod tests {
     fn test_b0pll_config() {
         // 验证 B0PLL 配置
         // 对应 C 代码: PLL(pll_rk3588, PLL_B0PLL, RK3588_B0_PLL_CON(0), RK3588_B0_PLL_MODE_CON, 0, 15, 0, ...)
-        let pll = &RK3588_PLL_CLOCKS[PllId::B0PLL as usize];
+        let pll = get_pll(PllId::B0PLL);
 
         // 验证 ID (匹配设备树绑定 rk3588-cru.h: PLL_B0PLL = 1)
         assert_eq!(pll.id, 1, "B0PLL ID should be 1");
@@ -374,7 +374,7 @@ mod tests {
     fn test_lpll_config() {
         // 验证 LPLL 配置
         // 对应 C 代码: PLL(pll_rk3588, PLL_LPLL, RK3588_LPLL_CON(16), RK3588_LPLL_MODE_CON, 0, 15, 0, ...)
-        let pll = &RK3588_PLL_CLOCKS[PllId::LPLL as usize];
+        let pll = get_pll(PllId::LPLL);
 
         assert_eq!(pll.id, 3, "LPLL ID should be 3");
 
@@ -395,7 +395,7 @@ mod tests {
     fn test_v0pll_config() {
         // 验证 V0PLL 配置
         // 对应 C 代码: PLL(pll_rk3588, PLL_V0PLL, RK3588_PLL_CON(88), RK3588_MODE_CON0, 4, 15, 0, ...)
-        let pll = &RK3588_PLL_CLOCKS[PllId::V0PLL as usize];
+        let pll = get_pll(PllId::V0PLL);
 
         assert_eq!(pll.id, 7, "V0PLL ID should be 7");
 
@@ -413,7 +413,7 @@ mod tests {
     fn test_aupll_config() {
         // 验证 AUPLL 配置
         // 对应 C 代码: PLL(pll_rk3588, PLL_AUPLL, RK3588_PLL_CON(96), RK3588_MODE_CON0, 6, 15, 0, ...)
-        let pll = &RK3588_PLL_CLOCKS[PllId::AUPLL as usize];
+        let pll = get_pll(PllId::AUPLL);
 
         assert_eq!(pll.id, 8, "AUPLL ID should be 8");
 
@@ -429,7 +429,7 @@ mod tests {
     fn test_cpll_config() {
         // 验证 CPLL 配置
         // 对应 C 代码: PLL(pll_rk3588, PLL_CPLL, RK3588_PLL_CON(104), RK3588_MODE_CON0, 8, 15, 0, ...)
-        let pll = &RK3588_PLL_CLOCKS[PllId::CPLL as usize];
+        let pll = get_pll(PllId::CPLL);
 
         assert_eq!(pll.id, 4, "CPLL ID should be 4");
 
@@ -445,7 +445,7 @@ mod tests {
     fn test_gpll_config() {
         // 验证 GPLL 配置
         // 对应 C 代码: PLL(pll_rk3588, PLL_GPLL, RK3588_PLL_CON(112), RK3588_MODE_CON0, 2, 15, 0, ...)
-        let pll = &RK3588_PLL_CLOCKS[PllId::GPLL as usize];
+        let pll = get_pll(PllId::GPLL);
 
         assert_eq!(pll.id, 5, "GPLL ID should be 5");
 
@@ -461,7 +461,7 @@ mod tests {
     fn test_npll_config() {
         // 验证 NPLL 配置
         // 对应 C 代码: PLL(pll_rk3588, PLL_NPLL, RK3588_PLL_CON(120), RK3588_MODE_CON0, 0, 15, 0, ...)
-        let pll = &RK3588_PLL_CLOCKS[PllId::NPLL as usize];
+        let pll = get_pll(PllId::NPLL);
 
         assert_eq!(pll.id, 6, "NPLL ID should be 6");
 
@@ -477,7 +477,7 @@ mod tests {
     fn test_ppll_config() {
         // 验证 PPLL 配置
         // 对应 C 代码: PLL(pll_rk3588, PLL_PPLL, RK3588_PMU_PLL_CON(128), RK3588_MODE_CON0, 10, 15, 0, ...)
-        let pll = &RK3588_PLL_CLOCKS[PllId::PPLL as usize];
+        let pll = get_pll(PllId::PPLL);
 
         assert_eq!(pll.id, 9, "PPLL ID should be 9");
 
@@ -580,56 +580,56 @@ mod tests {
     fn test_pll_config_complete_validation() {
         // 完整验证: 对比 C 代码 clk_rk3588.c:46-67 的所有配置
 
-        // B0PLL: [0] = PLL(pll_rk3588, PLL_B0PLL, RK3588_B0_PLL_CON(0), RK3588_B0_PLL_MODE_CON, 0, 15, 0)
-        let pll = &RK3588_PLL_CLOCKS[0];
+        // B0PLL: PLL_B0PLL = 1
+        let pll = get_pll(PllId::B0PLL);
         assert_eq!(pll.con_offset, b0_pll_con(0));
         assert_eq!(pll.mode_offset, RK3588_B0_PLL_MODE_CON);
         assert_eq!((pll.mode_shift, pll.lock_shift, pll.pll_flags), (0, 15, 0));
 
-        // B1PLL: [1] = PLL(pll_rk3588, PLL_B1PLL, RK3588_B1_PLL_CON(8), RK3588_B1_PLL_MODE_CON, 0, 15, 0)
-        let pll = &RK3588_PLL_CLOCKS[1];
+        // B1PLL: PLL_B1PLL = 2
+        let pll = get_pll(PllId::B1PLL);
         assert_eq!(pll.con_offset, b1_pll_con(8));
         assert_eq!(pll.mode_offset, RK3588_B1_PLL_MODE_CON);
         assert_eq!((pll.mode_shift, pll.lock_shift, pll.pll_flags), (0, 15, 0));
 
-        // LPLL: [2] = PLL(pll_rk3588, PLL_LPLL, RK3588_LPLL_CON(16), RK3588_LPLL_MODE_CON, 0, 15, 0, ...)
-        let pll = &RK3588_PLL_CLOCKS[2];
+        // LPLL: PLL_LPLL = 3
+        let pll = get_pll(PllId::LPLL);
         assert_eq!(pll.con_offset, lpll_con(16));
         assert_eq!(pll.mode_offset, RK3588_LPLL_MODE_CON);
         assert_eq!((pll.mode_shift, pll.lock_shift, pll.pll_flags), (0, 15, 0));
 
-        // V0PLL: [6] = PLL(pll_rk3588, PLL_V0PLL, RK3588_PLL_CON(88), RK3588_MODE_CON0, 4, 15, 0, ...)
-        let pll = &RK3588_PLL_CLOCKS[6];
+        // V0PLL: PLL_V0PLL = 7
+        let pll = get_pll(PllId::V0PLL);
         assert_eq!(pll.con_offset, pll_con(88));
         assert_eq!(pll.mode_offset, RK3588_MODE_CON0);
         assert_eq!((pll.mode_shift, pll.lock_shift, pll.pll_flags), (4, 15, 0));
 
-        // AUPLL: [7] = PLL(pll_rk3588, PLL_AUPLL, RK3588_PLL_CON(96), RK3588_MODE_CON0, 6, 15, 0, ...)
-        let pll = &RK3588_PLL_CLOCKS[7];
+        // AUPLL: PLL_AUPLL = 8
+        let pll = get_pll(PllId::AUPLL);
         assert_eq!(pll.con_offset, pll_con(96));
         assert_eq!(pll.mode_offset, RK3588_MODE_CON0);
         assert_eq!((pll.mode_shift, pll.lock_shift, pll.pll_flags), (6, 15, 0));
 
-        // CPLL: [3] = PLL(pll_rk3588, PLL_CPLL, RK3588_PLL_CON(104), RK3588_MODE_CON0, 8, 15, 0, ...)
-        let pll = &RK3588_PLL_CLOCKS[3];
+        // CPLL: PLL_CPLL = 4
+        let pll = get_pll(PllId::CPLL);
         assert_eq!(pll.con_offset, pll_con(104));
         assert_eq!(pll.mode_offset, RK3588_MODE_CON0);
         assert_eq!((pll.mode_shift, pll.lock_shift, pll.pll_flags), (8, 15, 0));
 
-        // GPLL: [4] = PLL(pll_rk3588, PLL_GPLL, RK3588_PLL_CON(112), RK3588_MODE_CON0, 2, 15, 0, ...)
-        let pll = &RK3588_PLL_CLOCKS[4];
+        // GPLL: PLL_GPLL = 5
+        let pll = get_pll(PllId::GPLL);
         assert_eq!(pll.con_offset, pll_con(112));
         assert_eq!(pll.mode_offset, RK3588_MODE_CON0);
         assert_eq!((pll.mode_shift, pll.lock_shift, pll.pll_flags), (2, 15, 0));
 
-        // NPLL: [5] = PLL(pll_rk3588, PLL_NPLL, RK3588_PLL_CON(120), RK3588_MODE_CON0, 0, 15, 0, ...)
-        let pll = &RK3588_PLL_CLOCKS[5];
+        // NPLL: PLL_NPLL = 6
+        let pll = get_pll(PllId::NPLL);
         assert_eq!(pll.con_offset, pll_con(120));
         assert_eq!(pll.mode_offset, RK3588_MODE_CON0);
         assert_eq!((pll.mode_shift, pll.lock_shift, pll.pll_flags), (0, 15, 0));
 
-        // PPLL: [8] = PLL(pll_rk3588, PLL_PPLL, RK3588_PMU_PLL_CON(128), RK3588_MODE_CON0, 10, 15, 0, ...)
-        let pll = &RK3588_PLL_CLOCKS[8];
+        // PPLL: PLL_PPLL = 9
+        let pll = get_pll(PllId::PPLL);
         assert_eq!(pll.con_offset, pmu_pll_con(128));
         assert_eq!(pll.mode_offset, RK3588_MODE_CON0);
         assert_eq!((pll.mode_shift, pll.lock_shift, pll.pll_flags), (10, 15, 0));

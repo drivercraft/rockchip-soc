@@ -6,22 +6,24 @@ RK3588 共有 9 个 PLL (Phase-Locked Loop) 时钟,用于生成系统所需的�
 
 ## PLL 列表
 
-| PLL   | ID  | 时钟 ID | 用途             | 默认频率   |
-|-------|-----|--------|------------------|-----------|
-| B0PLL | 0   | 1      | 大核0 PLL        | 816 MHz   |
-| B1PLL | 1   | 2      | 大核1 PLL        | 816 MHz   |
-| LPLL  | 2   | 3      | 小核 DSU PLL     | 816 MHz   |
-| CPLL  | 3   | 4      | 中心/通用 PLL    | 1500 MHz  |
-| GPLL  | 4   | 5      | 通用 PLL         | 1188 MHz  |
-| NPLL  | 5   | 6      | 网络/视频 PLL    | 850 MHz   |
-| V0PLL | 6   | 7      | 视频 PLL         | -         |
-| AUPLL | 7   | 8      | 音频 PLL         | -         |
-| PPLL  | 8   | 9      | PMU PLL          | 1100 MHz  |
+| PLL   | ID  | 数组索引 | 用途             | 默认频率   |
+|-------|-----:|---------:|------------------|-----------|
+| B0PLL | 1   | 0        | 大核0 PLL        | 816 MHz   |
+| B1PLL | 2   | 1        | 大核1 PLL        | 816 MHz   |
+| LPLL  | 3   | 2        | 小核 DSU PLL     | 816 MHz   |
+| CPLL  | 4   | 3        | 中心/通用 PLL    | 1500 MHz  |
+| GPLL  | 5   | 4        | 通用 PLL         | 1188 MHz  |
+| NPLL  | 6   | 5        | 网络/视频 PLL    | 850 MHz   |
+| V0PLL | 7   | 6        | 视频 PLL         | -         |
+| AUPLL | 8   | 7        | 音频 PLL         | -         |
+| PPLL  | 9   | 8        | PMU PLL          | 1100 MHz  |
+
+**重要**: `PllId` 枚举值直接匹配设备树绑定 (`rk3588-cru.h`) 的 PLL ID,从 **1** 开始。
 
 ## 寄存器映射
 
 | PLL   | CON Offset | Mode Offset | Mode Shift | Lock Shift |
-|-------|-----------|-------------|------------|------------|
+|-------|-----------:|-------------|------------|------------|
 | B0PLL | 0x50000   | 0x50280     | 0          | 15         |
 | B1PLL | 0x52020   | 0x52280     | 0          | 15         |
 | LPLL  | 0x58040   | 0x58280     | 0          | 15         |
@@ -86,7 +88,7 @@ result = (3144MHz + 1.727966MHz) >> 2
 支持 17 个预设频率 (100MHz - 1.5GHz):
 
 | 频率 (MHz) | P  | M   | S  | K     |
-|-----------|----|-----|----|-------|
+|-----------:|----|-----|----|-------|
 | 1500      | 2  | 250 | 1  | 0     |
 | 1200      | 2  | 200 | 1  | 0     |
 | 1188      | 2  | 198 | 1  | 0     |
@@ -109,14 +111,23 @@ result = (3144MHz + 1.727966MHz) >> 2
 
 ### 获取 PLL 配置
 
+**推荐方式** - 使用 `get_pll()` 函数:
+
 ```rust
 use rockchip_soc::rk3588::cru::pll::{PllId, get_pll};
 
-// 通过 ID 获取 GPLL 配置
+// 通过 PllId 获取 GPLL 配置
 let gpll = get_pll(PllId::GPLL);
 
 println!("GPLL 时钟 ID: {}", gpll.id);           // 5
 println!("控制寄存器偏移: 0x{:x}", gpll.con_offset);  // 0x1c0
+```
+
+**⚠️ 不推荐** - 直接访问数组 (仅内部使用):
+
+```rust
+// 需要手动计算索引: PllId - 1
+let gpll = &RK3588_PLL_CLOCKS[PllId::GPLL as usize - 1];
 ```
 
 ### 计算 PLL 输出频率
@@ -144,26 +155,69 @@ if let Some(rate) = PllId::GPLL.default_rate() {
 }
 ```
 
-## ID 映射说明
+### 遍历所有 PLL
 
-RK3588 PLL 存在两套编号系统:
+```rust
+use rockchip_soc::rk3588::cru::pll::{PllId, get_pll};
 
-| PLL   | PllId 枚举 | 数组索引 | PllClock.id | 设备树宏     |
-|-------|-----------|---------:|------------:|-------------|
-| B0PLL | `PllId::B0PLL` | 0 | 1 | `PLL_B0PLL` |
-| B1PLL | `PllId::B1PLL` | 1 | 2 | `PLL_B1PLL` |
-| LPLL  | `PllId::LPLL`  | 2 | 3 | `PLL_LPLL`  |
-| CPLL  | `PllId::CPLL`  | 3 | 4 | `PLL_CPLL`  |
-| GPLL  | `PllId::GPLL`  | 4 | 5 | `PLL_GPLL`  |
-| NPLL  | `PllId::NPLL`  | 5 | 6 | `PLL_NPLL`  |
-| V0PLL | `PllId::V0PLL` | 6 | 7 | `PLL_V0PLL` |
-| AUPLL | `PllId::AUPLL` | 7 | 8 | `PLL_AUPLL` |
-| PPLL  | `PllId::PPLL`  | 8 | 9 | `PLL_PPLL`  |
+// 遍历所有有效的 PLL (1-9)
+for id in 1..=9 {
+    if let Ok(pll_id) = id.try_into() {
+        let pll = get_pll(pll_id);
+        println!("{}: ID={}, 偏移=0x{:x}",
+                 pll_id.name(), pll.id, pll.con_offset);
+    }
+}
+```
 
-- **PllId 枚举**: 从 0 开始,用于数组索引访问
-- **PllClock.id**: 从 1 开始,匹配设备树绑定 `rk3588-cru.h`
+## 设计亮点
 
-详细说明见: [PLL_ID_MAPPING.md](PLL_ID_MAPPING.md)
+### PllId 枚举优化
+
+`PllId` 枚举值直接匹配设备树绑定:
+
+```rust
+pub enum PllId {
+    B0PLL = 1,  // 匹配 #define PLL_B0PLL 1
+    B1PLL = 2,  // 匹配 #define PLL_B1PLL 2
+    LPLL = 3,   // 匹配 #define PLL_LPLL  3
+    ...
+}
+```
+
+**优点**:
+- ✅ 消除了两套 ID 系统的混淆
+- ✅ `PllId` 值可直接用于时钟框架
+- ✅ 无需 `+1/-1` 转换
+- ✅ 语义清晰,不易出错
+
+### 安全的访问方式
+
+通过 `get_pll()` 函数封装数组访问:
+
+```rust
+pub const fn get_pll(id: PllId) -> &'static PllClock {
+    &RK3588_PLL_CLOCKS[id as usize - 1]  // 内部处理索引转换
+}
+```
+
+**优点**:
+- ✅ 隐藏索引转换细节
+- ✅ 防止直接数组访问错误
+- ✅ API 简洁直观
+
+## 与 u-boot 的对比
+
+| 项目 | u-boot C | Rust 实现 | 优势 |
+|------|----------|-----------|------|
+| PLL 数量 | 9 个 | 9 个 | ✅ 一致 |
+| 频率表项 | 17 项 | 17 项 | ✅ 一致 |
+| 寄存器偏移 | 一致 | 一致 | ✅ 一致 |
+| 计算公式 | 一致 | 一致 | ✅ 一致 |
+| ID 系统 | 混乱 | 统一 | ✅ **更清晰** |
+| 类型安全 | ❌ | ✅ 枚举 | ✅ **更好** |
+| 编译时检查 | ❌ | ✅ const fn | ✅ **更好** |
+| 数组访问 | 直接 | 封装 | ✅ **更安全** |
 
 ## 测试
 
@@ -174,7 +228,7 @@ cargo test --lib pll
 ```
 
 测试覆盖:
-- ✅ PLL 数量和 ID 顺序验证
+- ✅ PLL 数量和 ID 验证 (1-9)
 - ✅ 寄存器偏移验证
 - ✅ 频率计算验证 (整数和小数分频)
 - ✅ 9 个独立 PLL 配置验证
@@ -197,5 +251,6 @@ cargo test --lib pll
 - **YAGNI**: 只实现必需的功能
 
 ---
-**版本**: 1.0
+**版本**: 2.0
 **更新时间**: 2025-12-31
+**主要变更**: PllId 优化为从 1 开始,消除 ID 混淆
