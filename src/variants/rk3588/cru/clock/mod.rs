@@ -237,59 +237,51 @@ clk_id_group!(
 // =============================================================================
 
 /// 判断时钟 ID 是否为 PLL
-#[must_use]
-pub const fn is_pll_clk(clk_id: ClkId) -> bool {
-    let id = clk_id.value();
-    id >= 1 && id <= 10
+pub fn is_pll_clk(clk_id: ClkId) -> bool {
+    use crate::clock::ClkId;
+    (ClkId::PLL_B0PLL..=ClkId::PLL_PPLL).contains(&clk_id)
 }
 
 /// 判断时钟 ID 是否为 I2C
-#[must_use]
-pub const fn is_i2c_clk(clk_id: ClkId) -> bool {
-    let id = clk_id.value();
-    // CLK_I2C0 (647), CLK_I2C1-8 (141-148)
-    // PCLK_I2C0 (646), PCLK_I2C1-8 (133-140)
-    matches!(id, 141..=148 | 647 | 133..=140 | 646)
+pub fn is_i2c_clk(clk_id: ClkId) -> bool {
+    use crate::clock::ClkId;
+
+    // PMU I2C0: PCLK_I2C0, CLK_I2C0
+    // I2C1-8: PCLK_I2C1-8, CLK_I2C1-8
+    (ClkId::PCLK_I2C0..=ClkId::CLK_I2C0).contains(&clk_id)
+        || (ClkId::PCLK_I2C1..=ClkId::CLK_I2C8).contains(&clk_id)
 }
 
 /// 判断时钟 ID 是否为 UART
-#[must_use]
-pub const fn is_uart_clk(clk_id: ClkId) -> bool {
-    let id = clk_id.value();
-    // CLK_UART1-9 (182, 186, 190, 194, 198, 202, 206, 210, 214)
-    // CLK_UART0 (685)
-    // SCLK_UART0-9 (686, 183, 187, 191, 195, 199, 203, 207, 211, 215)
-    // PCLK_UART0-9 (687, 171-179)
-    // CLK_UARTx_SRC, CLK_UARTx_FRAC (180-181, 184-185, etc.)
-    matches!(id,
-        171..=182 | 183..=186 | 187..=190 | 191..=194 | 195..=198 |
-        199..=202 | 203..=206 | 207..=210 | 211..=215 |
-        683..=687
-    )
+pub fn is_uart_clk(clk_id: ClkId) -> bool {
+    use crate::clock::ClkId;
+
+    (ClkId::CLK_UART0_SRC..=ClkId::PCLK_UART0).contains(&clk_id)      // UART0 (PMU)
+        || (ClkId::PCLK_UART1..=ClkId::SCLK_UART9).contains(&clk_id) // UART1-9
 }
 
 /// 判断时钟 ID 是否为 SPI
-#[must_use]
-pub const fn is_spi_clk(clk_id: ClkId) -> bool {
-    let id = clk_id.value();
-    matches!(id, 158..=167)
+pub fn is_spi_clk(clk_id: ClkId) -> bool {
+    use crate::clock::ClkId;
+    (ClkId::PCLK_SPI0..=ClkId::CLK_SPI4).contains(&clk_id)
 }
 
 /// 判断时钟 ID 是否为 PWM
-#[must_use]
-pub const fn is_pwm_clk(clk_id: ClkId) -> bool {
-    let id = clk_id.value();
-    matches!(id,
-        83..=91 |  // PWM1-3
-        676..=678   // PMU1PWM
-    )
+pub fn is_pwm_clk(clk_id: ClkId) -> bool {
+    use crate::clock::ClkId;
+
+    // PWM1-3: 83-91, PMU1PWM: 676-678
+    (ClkId::PCLK_PWM1..=ClkId::CLK_PWM3_CAPTURE).contains(&clk_id)
+        || (ClkId::PCLK_PMU1PWM..=ClkId::CLK_PMU1PWM_CAPTURE).contains(&clk_id)
 }
 
 /// 判断时钟 ID 是否为 ADC
-#[must_use]
-pub const fn is_adc_clk(clk_id: ClkId) -> bool {
-    let id = clk_id.value();
-    matches!(id, 156..=157 | 169..=170)
+pub fn is_adc_clk(clk_id: ClkId) -> bool {
+    use crate::clock::ClkId;
+
+    // SARADC: 156-157, TSADC: 169-170
+    (ClkId::PCLK_SARADC..=ClkId::CLK_SARADC).contains(&clk_id)
+        || (ClkId::PCLK_TSADC..=ClkId::CLK_TSADC).contains(&clk_id)
 }
 
 /// 获取 I2C 编号 (0-8)
@@ -297,20 +289,28 @@ pub const fn is_adc_clk(clk_id: ClkId) -> bool {
 /// # 返回
 ///
 /// 返回 I2C 编号，如果不是 I2C 时钟则返回 None
-#[must_use]
-pub const fn get_i2c_num(clk_id: ClkId) -> Option<u32> {
-    let id = clk_id.value();
-    match id {
-        646 | 647 => Some(0), // I2C0 (PMU)
-        141 | 133 => Some(1), // I2C1
-        142 | 134 => Some(2), // I2C2
-        143 | 135 => Some(3), // I2C3
-        144 | 136 => Some(4), // I2C4
-        145 | 137 => Some(5), // I2C5
-        146 | 138 => Some(6), // I2C6
-        147 | 139 => Some(7), // I2C7
-        148 | 140 => Some(8), // I2C8
-        _ => None,
+pub fn get_i2c_num(clk_id: ClkId) -> Option<u32> {
+    use crate::clock::ClkId;
+
+    // I2C0 (PMU): PCLK_I2C0, CLK_I2C0
+    if (ClkId::PCLK_I2C0..=ClkId::CLK_I2C0).contains(&clk_id) {
+        Some(0)
+    }
+    // I2C1-8: PCLK 和 CLK 交替出现
+    else if (ClkId::PCLK_I2C1..=ClkId::CLK_I2C8).contains(&clk_id) {
+        match clk_id {
+            ClkId::CLK_I2C1 | ClkId::PCLK_I2C1 => Some(1),
+            ClkId::CLK_I2C2 | ClkId::PCLK_I2C2 => Some(2),
+            ClkId::CLK_I2C3 | ClkId::PCLK_I2C3 => Some(3),
+            ClkId::CLK_I2C4 | ClkId::PCLK_I2C4 => Some(4),
+            ClkId::CLK_I2C5 | ClkId::PCLK_I2C5 => Some(5),
+            ClkId::CLK_I2C6 | ClkId::PCLK_I2C6 => Some(6),
+            ClkId::CLK_I2C7 | ClkId::PCLK_I2C7 => Some(7),
+            ClkId::CLK_I2C8 | ClkId::PCLK_I2C8 => Some(8),
+            _ => None,
+        }
+    } else {
+        None
     }
 }
 
@@ -319,21 +319,31 @@ pub const fn get_i2c_num(clk_id: ClkId) -> Option<u32> {
 /// # 返回
 ///
 /// 返回 UART 编号，如果不是 UART 时钟则返回 None
-#[must_use]
-pub const fn get_uart_num(clk_id: ClkId) -> Option<u32> {
-    let id = clk_id.value();
-    match id {
-        683..=687 => Some(0), // UART0 (PMU)
-        171..=183 => Some(1), // UART1
-        184..=187 => Some(2), // UART2
-        188..=191 => Some(3), // UART3
-        192..=195 => Some(4), // UART4
-        196..=199 => Some(5), // UART5
-        200..=203 => Some(6), // UART6
-        204..=207 => Some(7), // UART7
-        208..=211 => Some(8), // UART8
-        212..=215 => Some(9), // UART9
-        _ => None,
+pub fn get_uart_num(clk_id: ClkId) -> Option<u32> {
+    use crate::clock::ClkId;
+
+    if (ClkId::CLK_UART0_SRC..=ClkId::PCLK_UART0).contains(&clk_id) {
+        Some(0) // UART0 (PMU)
+    } else if (ClkId::PCLK_UART1..=ClkId::SCLK_UART1).contains(&clk_id) {
+        Some(1) // UART1
+    } else if (ClkId::CLK_UART2_SRC..=ClkId::SCLK_UART2).contains(&clk_id) {
+        Some(2) // UART2
+    } else if (ClkId::CLK_UART3_SRC..=ClkId::SCLK_UART3).contains(&clk_id) {
+        Some(3) // UART3
+    } else if (ClkId::CLK_UART4_SRC..=ClkId::SCLK_UART4).contains(&clk_id) {
+        Some(4) // UART4
+    } else if (ClkId::CLK_UART5_SRC..=ClkId::SCLK_UART5).contains(&clk_id) {
+        Some(5) // UART5
+    } else if (ClkId::CLK_UART6_SRC..=ClkId::SCLK_UART6).contains(&clk_id) {
+        Some(6) // UART6
+    } else if (ClkId::CLK_UART7_SRC..=ClkId::SCLK_UART7).contains(&clk_id) {
+        Some(7) // UART7
+    } else if (ClkId::CLK_UART8_SRC..=ClkId::SCLK_UART8).contains(&clk_id) {
+        Some(8) // UART8
+    } else if (ClkId::CLK_UART9_SRC..=ClkId::SCLK_UART9).contains(&clk_id) {
+        Some(9) // UART9
+    } else {
+        None
     }
 }
 
@@ -342,16 +352,21 @@ pub const fn get_uart_num(clk_id: ClkId) -> Option<u32> {
 /// # 返回
 ///
 /// 返回 SPI 编号，如果不是 SPI 时钟则返回 None
-#[must_use]
-pub const fn get_spi_num(clk_id: ClkId) -> Option<u32> {
-    let id = clk_id.value();
-    match id {
-        158 | 163 => Some(0), // SPI0
-        159 | 164 => Some(1), // SPI1
-        160 | 165 => Some(2), // SPI2
-        161 | 166 => Some(3), // SPI3
-        162 | 167 => Some(4), // SPI4
-        _ => None,
+pub fn get_spi_num(clk_id: ClkId) -> Option<u32> {
+    use crate::clock::ClkId;
+
+    // SPI0-4: PCLK 和 CLK 交替出现
+    if (ClkId::PCLK_SPI0..=ClkId::CLK_SPI4).contains(&clk_id) {
+        match clk_id {
+            ClkId::PCLK_SPI0 | ClkId::CLK_SPI0 => Some(0),
+            ClkId::PCLK_SPI1 | ClkId::CLK_SPI1 => Some(1),
+            ClkId::PCLK_SPI2 | ClkId::CLK_SPI2 => Some(2),
+            ClkId::PCLK_SPI3 | ClkId::CLK_SPI3 => Some(3),
+            ClkId::PCLK_SPI4 | ClkId::CLK_SPI4 => Some(4),
+            _ => None,
+        }
+    } else {
+        None
     }
 }
 
@@ -497,6 +512,67 @@ mod tests {
         assert_eq!(get_uart_num(PCLK_UART1), Some(1));
         assert_eq!(get_uart_num(SCLK_UART4), Some(4));
         assert_eq!(get_uart_num(CLK_I2C1), None);
+    }
+
+    #[test]
+    fn test_get_uart_num_with_boundaries() {
+        use crate::clock::ClkId;
+
+        // 测试每个 UART 的边界时钟
+        // UART0 (PMU)
+        assert_eq!(get_uart_num(ClkId::CLK_UART0_SRC), Some(0));
+        assert_eq!(get_uart_num(ClkId::PCLK_UART0), Some(0));
+
+        // UART1
+        assert_eq!(get_uart_num(ClkId::PCLK_UART1), Some(1));
+        assert_eq!(get_uart_num(ClkId::SCLK_UART1), Some(1));
+
+        // UART2
+        assert_eq!(get_uart_num(ClkId::CLK_UART2_SRC), Some(2));
+        assert_eq!(get_uart_num(ClkId::SCLK_UART2), Some(2));
+
+        // UART3
+        assert_eq!(get_uart_num(ClkId::CLK_UART3_SRC), Some(3));
+        assert_eq!(get_uart_num(ClkId::SCLK_UART3), Some(3));
+
+        // UART4
+        assert_eq!(get_uart_num(ClkId::CLK_UART4_SRC), Some(4));
+        assert_eq!(get_uart_num(ClkId::SCLK_UART4), Some(4));
+
+        // UART5
+        assert_eq!(get_uart_num(ClkId::CLK_UART5_SRC), Some(5));
+        assert_eq!(get_uart_num(ClkId::SCLK_UART5), Some(5));
+
+        // UART6
+        assert_eq!(get_uart_num(ClkId::CLK_UART6_SRC), Some(6));
+        assert_eq!(get_uart_num(ClkId::SCLK_UART6), Some(6));
+
+        // UART7
+        assert_eq!(get_uart_num(ClkId::CLK_UART7_SRC), Some(7));
+        assert_eq!(get_uart_num(ClkId::SCLK_UART7), Some(7));
+
+        // UART8
+        assert_eq!(get_uart_num(ClkId::CLK_UART8_SRC), Some(8));
+        assert_eq!(get_uart_num(ClkId::SCLK_UART8), Some(8));
+
+        // UART9
+        assert_eq!(get_uart_num(ClkId::CLK_UART9_SRC), Some(9));
+        assert_eq!(get_uart_num(ClkId::SCLK_UART9), Some(9));
+    }
+
+    #[test]
+    fn test_clkid_comparison() {
+        use crate::clock::ClkId;
+
+        // 验证 ClkId 的比较运算符正常工作
+        assert!(ClkId::PCLK_UART1 < ClkId::SCLK_UART1);
+        assert!(ClkId::CLK_UART2_SRC <= ClkId::SCLK_UART2);
+        assert!(ClkId::SCLK_UART9 > ClkId::CLK_UART9_SRC);
+
+        // 验证边界值的正确性
+        assert!(ClkId::SCLK_UART1.value() == 183);
+        assert!(ClkId::CLK_UART2_SRC.value() == 184);
+        assert!(ClkId::SCLK_UART9.value() == 215);
     }
 
     #[test]
