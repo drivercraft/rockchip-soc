@@ -29,7 +29,7 @@ impl Cru {
             _ => return 0,
         };
 
-        let sel = (self.read(con as u32) >> sel_shift) & 1;
+        let sel = (self.read(con) >> sel_shift) & 1;
         if sel == 0 { 200 * MHZ } else { 100 * MHZ }
     }
 
@@ -42,7 +42,7 @@ impl Cru {
     /// - 100MHz: GPLL/12 或 CPLL/15
     /// - 200MHz: GPLL/6 或 CPLL/7.5
     pub(crate) fn i2c_set_rate(&mut self, id: ClkId, rate_hz: u64) -> u64 {
-        let src_200m = if rate_hz >= 198 * MHZ as u64 { 0 } else { 1 };
+        let src_200m = if rate_hz >= 198 * MHZ { 0 } else { 1 };
 
         let (offset, mask, shift) = match id {
             CLK_I2C0 => (pmu_clksel_con(3), 1 << 6, 6),
@@ -57,7 +57,7 @@ impl Cru {
             _ => return 0,
         };
 
-        self.clrsetreg(offset as u32, mask, src_200m << shift);
+        self.clrsetreg(offset, mask, src_200m << shift);
 
         if src_200m == 0 { 200 * MHZ } else { 100 * MHZ }
     }
@@ -70,7 +70,7 @@ impl Cru {
     ///
     /// 参考 u-boot: drivers/clk/rockchip/clk_rk3588.c:rk3588_spi_get_clk()
     pub(crate) fn spi_get_rate(&self, id: ClkId) -> u64 {
-        let con = self.read(clksel_con(59) as u32);
+        let con = self.read(clksel_con(59));
         let sel_shift = match id {
             CLK_SPI0 => 2,
             CLK_SPI1 => 4,
@@ -93,9 +93,9 @@ impl Cru {
     ///
     /// 参考 u-boot: drivers/clk/rockchip/clk_rk3588.c:rk3588_spi_set_clk()
     pub(crate) fn spi_set_rate(&mut self, id: ClkId, rate_hz: u64) -> u64 {
-        let src_clk = if rate_hz >= 198 * MHZ as u64 {
+        let src_clk = if rate_hz >= 198 * MHZ {
             0 // CLK_SPI_SEL_200M
-        } else if rate_hz >= 140 * MHZ as u64 {
+        } else if rate_hz >= 140 * MHZ {
             1 // CLK_SPI_SEL_150M
         } else {
             2 // CLK_SPI_SEL_24M
@@ -110,7 +110,7 @@ impl Cru {
             _ => return 0,
         };
 
-        self.clrsetreg(clksel_con(59) as u32, mask, src_clk << shift);
+        self.clrsetreg(clksel_con(59), mask, src_clk << shift);
 
         match src_clk {
             0 => 200 * MHZ,
@@ -136,7 +136,7 @@ impl Cru {
             _ => return 0,
         };
 
-        let sel = (self.read(con as u32) >> sel_shift) & 0x3;
+        let sel = (self.read(con) >> sel_shift) & 0x3;
         match sel {
             0 => 100 * MHZ, // CLK_PWM_SEL_100M
             1 => 50 * MHZ,  // CLK_PWM_SEL_50M
@@ -149,9 +149,9 @@ impl Cru {
     ///
     /// 参考 u-boot: drivers/clk/rockchip/clk_rk3588.c:rk3588_pwm_set_clk()
     pub(crate) fn pwm_set_rate(&mut self, id: ClkId, rate_hz: u64) -> u64 {
-        let src_clk = if rate_hz >= 99 * MHZ as u64 {
+        let src_clk = if rate_hz >= 99 * MHZ {
             0 // CLK_PWM_SEL_100M
-        } else if rate_hz >= 50 * MHZ as u64 {
+        } else if rate_hz >= 50 * MHZ {
             1 // CLK_PWM_SEL_50M
         } else {
             2 // CLK_PWM_SEL_24M
@@ -160,12 +160,12 @@ impl Cru {
         let (offset, mask, shift) = match id {
             CLK_PWM1 => (clksel_con(59), 0x3 << 12, 12),
             CLK_PWM2 => (clksel_con(59), 0x3 << 14, 14),
-            CLK_PWM3 => (clksel_con(60), 0x3 << 0, 0),
+            CLK_PWM3 => (clksel_con(60), 0x3, 0),
             CLK_PMU1PWM => (pmu_clksel_con(2), 0x3 << 9, 9),
             _ => return 0,
         };
 
-        self.clrsetreg(offset as u32, mask, src_clk << shift);
+        self.clrsetreg(offset, mask, src_clk << shift);
 
         match src_clk {
             0 => 100 * MHZ,
@@ -185,17 +185,17 @@ impl Cru {
     pub(crate) fn adc_get_rate(&self, id: ClkId) -> u64 {
         match id {
             CLK_SARADC => {
-                let con = self.read(clksel_con(40) as u32);
+                let con = self.read(clksel_con(40));
                 let div = ((con & 0xFF) >> 6) as u64;
                 let sel = (con >> 14) & 1;
                 let prate = if sel == 1 { OSC_HZ } else { self.gpll_hz };
                 prate / (div + 1)
             }
             CLK_TSADC => {
-                let con = self.read(clksel_con(41) as u32);
+                let con = self.read(clksel_con(41));
                 let div = (con & 0xFF) as u64;
                 let sel = (con >> 8) & 1;
-                let prate = if sel == 1 { OSC_HZ } else { 100 * MHZ as u64 };
+                let prate = if sel == 1 { OSC_HZ } else { 100 * MHZ };
                 prate / (div + 1)
             }
             _ => 0,
@@ -208,7 +208,7 @@ impl Cru {
     pub(crate) fn adc_set_rate(&mut self, id: ClkId, rate_hz: u64) -> u64 {
         match id {
             CLK_SARADC => {
-                if OSC_HZ % rate_hz == 0 {
+                if OSC_HZ.is_multiple_of(rate_hz) {
                     let src_clk_div = (OSC_HZ / rate_hz) as u32;
                     self.clrsetreg(
                         clksel_con(40),
@@ -221,13 +221,13 @@ impl Cru {
                     self.clrsetreg(
                         clksel_con(40),
                         (1 << 14) | (0xFF << 6),
-                        (0 << 14) | ((src_clk_div - 1) << 6),
+                        (((src_clk_div - 1) << 6)),
                     );
                     self.gpll_hz / (src_clk_div as u64)
                 }
             }
             CLK_TSADC => {
-                if OSC_HZ % rate_hz == 0 {
+                if OSC_HZ.is_multiple_of(rate_hz) {
                     let src_clk_div = (OSC_HZ / rate_hz).min(255) as u32;
                     self.clrsetreg(
                         clksel_con(41),
@@ -240,7 +240,7 @@ impl Cru {
                     self.clrsetreg(
                         clksel_con(41),
                         (1 << 8) | 0xFF,
-                        (0 << 8) | (src_clk_div - 1),
+                        ((src_clk_div - 1)),
                     );
                     100 * MHZ / (src_clk_div as u64)
                 }
@@ -268,7 +268,7 @@ impl Cru {
         };
 
         let con = self.read(clksel_con(reg + 2));
-        let src = (con >> 0) & 0x3;
+        let src = con & 0x3;
 
         let con = self.read(clksel_con(reg));
         let div = ((con >> 9) & 0x1F) as u64;
@@ -307,11 +307,11 @@ impl Cru {
             _ => return 0,
         };
 
-        let (clk_src, uart_src, div) = if self.gpll_hz % rate_hz == 0 {
+        let (clk_src, uart_src, div) = if self.gpll_hz.is_multiple_of(rate_hz) {
             (0, 0, (self.gpll_hz / rate_hz) as u32) // GPLL, SEL_SRC
-        } else if self.cpll_hz % rate_hz == 0 {
+        } else if self.cpll_hz.is_multiple_of(rate_hz) {
             (1, 0, (self.cpll_hz / rate_hz) as u32) // CPLL, SEL_SRC
-        } else if rate_hz == OSC_HZ as u64 {
+        } else if rate_hz == OSC_HZ {
             (0, 2, 2) // GPLL, SEL_XIN24M
         } else {
             // 小数分频模式 - 简化实现
@@ -377,7 +377,7 @@ impl Cru {
     pub(crate) fn root_clk_get_rate(&self, id: ClkId) -> u64 {
         match id {
             ACLK_BUS_ROOT => {
-                let clksel_38 = self.read(clksel_con(38) as u32);
+                let clksel_38 = self.read(clksel_con(38));
                 let div = ((clksel_38 & 0x1F) + 1) as u64;
                 self.gpll_hz / div
             }
