@@ -8,10 +8,22 @@
 
 1. **[PLL.md](PLL.md)** - PLL 时钟配置完整说明
 2. **[TEST_REPORT.md](TEST_REPORT.md)** - PLL 配置测试报告
+3. **[CRU_INIT_VERIFICATION.md](CRU_INIT_VERIFICATION.md)** - CRU 初始化验证
 
 **注意**: `PLL_ID_MAPPING.md` 已过时,因为 PllId 优化已消除双重 ID 系统的混淆。详见 [PLL.md#设计亮点](PLL.md#设计亮点)。
 
 ## 📖 文档说明
+
+### CRU_INIT_VERIFICATION.md - CRU 初始化验证
+
+包含内容:
+- u-boot `rk3588_clk_init()` 配置分析
+- Rust 实现的寄存器验证逻辑
+- 单元测试覆盖
+- Debug 输出示例
+- 寄存器地址映射
+
+**适合**: 需要了解 CRU 初始化和验证逻辑的开发者
 
 ### PLL.md - PLL 时钟配置
 

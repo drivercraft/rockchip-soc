@@ -33,7 +33,7 @@ cargo install ostool
 cargo test --test test --target aarch64-unknown-none-softfloat
 
 # 带 u-boot 的开发板测试
-cargo test --test test --target aarch64-unknown-none-softfloat -- -- uboot
+cargo test --test test --target aarch64-unknown-none-softfloat -- uboot
 ```
 
 ## 项目结构
