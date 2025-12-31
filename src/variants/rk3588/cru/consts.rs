@@ -46,7 +46,7 @@ pub const CLKSEL_CON_OFFSET: u32 = 0x0300;
 
 /// 时钟选择寄存器偏移
 pub const fn clksel_con(x: u32) -> u32 {
-    x * 0x4 + CLKSEL_CON_OFFSET
+    (x * 0x4) + CLKSEL_CON_OFFSET
 }
 
 /// 时钟门控寄存器偏移

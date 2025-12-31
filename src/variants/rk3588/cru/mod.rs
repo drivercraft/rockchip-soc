@@ -87,7 +87,7 @@ impl Cru {
         //                     div << ACLK_BUS_ROOT_DIV_SHIFT);
         // 预期: SEL=0 (GPLL), DIV=4
         // ========================================================================
-        let clksel_38 = self.read(clksel_con(38));
+        let clksel_38 = self.read(clksel_con(38) as _);
         let bus_root_sel = (clksel_38 & ACLK_BUS_ROOT_SEL_MASK) >> ACLK_BUS_ROOT_SEL_SHIFT;
         let bus_root_div = (clksel_38 & ACLK_BUS_ROOT_DIV_MASK) >> ACLK_BUS_ROOT_DIV_SHIFT;
 
@@ -144,7 +144,7 @@ impl Cru {
         //                      (ACLK_TOP_S200_SEL_200M << ACLK_TOP_S200_SEL_SHIFT));
         // 预期: S400_SEL=0 (400MHz), S200_SEL=0 (200MHz)
         // ========================================================================
-        let clksel_9 = self.read(clksel_con(9));
+        let clksel_9 = self.read(clksel_con(9) as _);
         let s400_sel = (clksel_9 & ACLK_TOP_S400_SEL_MASK) >> ACLK_TOP_S400_SEL_SHIFT;
         let s200_sel = (clksel_9 & ACLK_TOP_S200_SEL_MASK) >> ACLK_TOP_S200_SEL_SHIFT;
 
@@ -309,32 +309,10 @@ impl Cru {
     /// * `mask` - 位掩码（要修改的位）
     /// * `value` - 要写入的值（已移位到正确位置）
     fn clksel_con_write(&mut self, index: u32, mask: u32, value: u32) {
-        let reg_addr = self.base + clksel_con(index) as usize;
-
-        debug!(
-            "CRU@{:x}: Writing clksel_con[{}] = 0x{:08x} (mask=0x{:08x})",
-            self.base, index, value, mask
-        );
-
-        unsafe {
-            let reg = reg_addr as *mut u32;
-
-            // 读取当前值
-            let current = reg.read_volatile();
-
-            // 清除要修改的位，然后设置新值
-            let new_value = (current & !mask) | (value & mask);
-
-            // 写入新值
-            reg.write_volatile(new_value);
-
-            // 读取并验证
-            let verify = reg.read_volatile();
-            debug!(
-                "CRU@{:x}: clksel_con[{}] readback: 0x{:08x}",
-                self.base, index, verify
-            );
-        }
+        let reg_offset = clksel_con(index);
+        let current = self.read(reg_offset);
+        let new_value = (current & !mask) | (value & mask);
+        self.write(reg_offset, new_value);
     }
 
     pub fn grf_mmio_ls() -> &'static [GrfMmio] {
@@ -342,7 +320,7 @@ impl Cru {
     }
 
     fn reg(&self, offset: u32) -> *mut u32 {
-        (self.base as u32 + offset) as *mut u32
+        (self.base + offset as usize) as *mut u32
     }
 
     fn read(&self, offset: u32) -> u32 {
@@ -350,7 +328,7 @@ impl Cru {
     }
 
     fn write(&self, offset: u32, value: u32) {
-        unsafe { core::ptr::write_volatile(self.reg(offset as _), value) }
+        unsafe { core::ptr::write_volatile(self.reg(offset), value) }
     }
 }
 
