@@ -3,7 +3,7 @@
 //! 参考 u-boot: drivers/clk/rockchip/clk_rk3588.c
 
 use super::Cru;
-use crate::{clock::ClkId, rk3588::cru::consts::*};
+use crate::{clock::ClkId, rk3588::cru::consts::*, rk3588::cru::clock::*};
 
 impl Cru {
     // ========================================================================
@@ -16,16 +16,16 @@ impl Cru {
     ///
     /// I2C 时钟源选择：100MHz 或 200MHz
     pub(crate) fn i2c_get_rate(&self, id: ClkId) -> u64 {
-        let (con, sel_shift) = match id.value() {
-            146 => (pmu_clksel_con(3), 6), // CLK_I2C0
-            147 => (clksel_con(38), 6),    // CLK_I2C1
-            148 => (clksel_con(38), 7),    // CLK_I2C2
-            149 => (clksel_con(38), 8),    // CLK_I2C3
-            150 => (clksel_con(38), 9),    // CLK_I2C4
-            151 => (clksel_con(38), 10),   // CLK_I2C5
-            152 => (clksel_con(38), 11),   // CLK_I2C6
-            153 => (clksel_con(38), 12),   // CLK_I2C7
-            154 => (clksel_con(38), 13),   // CLK_I2C8
+        let (con, sel_shift) = match id {
+            CLK_I2C0 => (pmu_clksel_con(3), 6),
+            CLK_I2C1 => (clksel_con(38), 6),
+            CLK_I2C2 => (clksel_con(38), 7),
+            CLK_I2C3 => (clksel_con(38), 8),
+            CLK_I2C4 => (clksel_con(38), 9),
+            CLK_I2C5 => (clksel_con(38), 10),
+            CLK_I2C6 => (clksel_con(38), 11),
+            CLK_I2C7 => (clksel_con(38), 12),
+            CLK_I2C8 => (clksel_con(38), 13),
             _ => return 0,
         };
 
@@ -44,16 +44,16 @@ impl Cru {
     pub(crate) fn i2c_set_rate(&mut self, id: ClkId, rate_hz: u64) -> u64 {
         let src_200m = if rate_hz >= 198 * MHZ as u64 { 0 } else { 1 };
 
-        let (offset, mask, shift) = match id.value() {
-            146 => (pmu_clksel_con(3), 1 << 6, 6), // CLK_I2C0
-            147 => (clksel_con(38), 1 << 6, 6),    // CLK_I2C1
-            148 => (clksel_con(38), 1 << 7, 7),    // CLK_I2C2
-            149 => (clksel_con(38), 1 << 8, 8),    // CLK_I2C3
-            150 => (clksel_con(38), 1 << 9, 9),    // CLK_I2C4
-            151 => (clksel_con(38), 1 << 10, 10),  // CLK_I2C5
-            152 => (clksel_con(38), 1 << 11, 11),  // CLK_I2C6
-            153 => (clksel_con(38), 1 << 12, 12),  // CLK_I2C7
-            154 => (clksel_con(38), 1 << 13, 13),  // CLK_I2C8
+        let (offset, mask, shift) = match id {
+            CLK_I2C0 => (pmu_clksel_con(3), 1 << 6, 6),
+            CLK_I2C1 => (clksel_con(38), 1 << 6, 6),
+            CLK_I2C2 => (clksel_con(38), 1 << 7, 7),
+            CLK_I2C3 => (clksel_con(38), 1 << 8, 8),
+            CLK_I2C4 => (clksel_con(38), 1 << 9, 9),
+            CLK_I2C5 => (clksel_con(38), 1 << 10, 10),
+            CLK_I2C6 => (clksel_con(38), 1 << 11, 11),
+            CLK_I2C7 => (clksel_con(38), 1 << 12, 12),
+            CLK_I2C8 => (clksel_con(38), 1 << 13, 13),
             _ => return 0,
         };
 
@@ -71,12 +71,12 @@ impl Cru {
     /// 参考 u-boot: drivers/clk/rockchip/clk_rk3588.c:rk3588_spi_get_clk()
     pub(crate) fn spi_get_rate(&self, id: ClkId) -> u64 {
         let con = self.read(clksel_con(59) as u32);
-        let sel_shift = match id.value() {
-            165 => 2,  // CLK_SPI0
-            166 => 4,  // CLK_SPI1
-            167 => 6,  // CLK_SPI2
-            168 => 8,  // CLK_SPI3
-            169 => 10, // CLK_SPI4
+        let sel_shift = match id {
+            CLK_SPI0 => 2,
+            CLK_SPI1 => 4,
+            CLK_SPI2 => 6,
+            CLK_SPI3 => 8,
+            CLK_SPI4 => 10,
             _ => return 0,
         };
 
@@ -101,12 +101,12 @@ impl Cru {
             2 // CLK_SPI_SEL_24M
         };
 
-        let (mask, shift) = match id.value() {
-            165 => (0x3 << 2, 2),   // CLK_SPI0
-            166 => (0x3 << 4, 4),   // CLK_SPI1
-            167 => (0x3 << 6, 6),   // CLK_SPI2
-            168 => (0x3 << 8, 8),   // CLK_SPI3
-            169 => (0x3 << 10, 10), // CLK_SPI4
+        let (mask, shift) = match id {
+            CLK_SPI0 => (0x3 << 2, 2),
+            CLK_SPI1 => (0x3 << 4, 4),
+            CLK_SPI2 => (0x3 << 6, 6),
+            CLK_SPI3 => (0x3 << 8, 8),
+            CLK_SPI4 => (0x3 << 10, 10),
             _ => return 0,
         };
 
@@ -128,11 +128,11 @@ impl Cru {
     ///
     /// 参考 u-boot: drivers/clk/rockchip/clk_rk3588.c:rk3588_pwm_get_clk()
     pub(crate) fn pwm_get_rate(&self, id: ClkId) -> u64 {
-        let (con, sel_shift) = match id.value() {
-            84 => (clksel_con(59), 12),    // CLK_PWM1
-            87 => (clksel_con(59), 14),    // CLK_PWM2
-            90 => (clksel_con(60), 0),     // CLK_PWM3
-            646 => (pmu_clksel_con(2), 9), // CLK_PMU1PWM
+        let (con, sel_shift) = match id {
+            CLK_PWM1 => (clksel_con(59), 12),
+            CLK_PWM2 => (clksel_con(59), 14),
+            CLK_PWM3 => (clksel_con(60), 0),
+            CLK_PMU1PWM => (pmu_clksel_con(2), 9),
             _ => return 0,
         };
 
@@ -157,11 +157,11 @@ impl Cru {
             2 // CLK_PWM_SEL_24M
         };
 
-        let (offset, mask, shift) = match id.value() {
-            84 => (clksel_con(59), 0x3 << 12, 12),   // CLK_PWM1
-            87 => (clksel_con(59), 0x3 << 14, 14),   // CLK_PWM2
-            90 => (clksel_con(60), 0x3 << 0, 0),     // CLK_PWM3
-            646 => (pmu_clksel_con(2), 0x3 << 9, 9), // CLK_PMU1PWM
+        let (offset, mask, shift) = match id {
+            CLK_PWM1 => (clksel_con(59), 0x3 << 12, 12),
+            CLK_PWM2 => (clksel_con(59), 0x3 << 14, 14),
+            CLK_PWM3 => (clksel_con(60), 0x3 << 0, 0),
+            CLK_PMU1PWM => (pmu_clksel_con(2), 0x3 << 9, 9),
             _ => return 0,
         };
 
@@ -183,17 +183,15 @@ impl Cru {
     ///
     /// 参考 u-boot: drivers/clk/rockchip/clk_rk3588.c:rk3588_adc_get_clk()
     pub(crate) fn adc_get_rate(&self, id: ClkId) -> u64 {
-        match id.value() {
-            653 => {
-                // CLK_SARADC
+        match id {
+            CLK_SARADC => {
                 let con = self.read(clksel_con(40) as u32);
                 let div = ((con & 0xFF) >> 6) as u64;
                 let sel = (con >> 14) & 1;
                 let prate = if sel == 1 { OSC_HZ } else { self.gpll_hz };
                 prate / (div + 1)
             }
-            654 => {
-                // CLK_TSADC
+            CLK_TSADC => {
                 let con = self.read(clksel_con(41) as u32);
                 let div = (con & 0xFF) as u64;
                 let sel = (con >> 8) & 1;
@@ -208,9 +206,8 @@ impl Cru {
     ///
     /// 参考 u-boot: drivers/clk/rockchip/clk_rk3588.c:rk3588_adc_set_clk()
     pub(crate) fn adc_set_rate(&mut self, id: ClkId, rate_hz: u64) -> u64 {
-        match id.value() {
-            653 => {
-                // CLK_SARADC
+        match id {
+            CLK_SARADC => {
                 if OSC_HZ % rate_hz == 0 {
                     let src_clk_div = (OSC_HZ / rate_hz) as u32;
                     self.clrsetreg(
@@ -229,8 +226,7 @@ impl Cru {
                     self.gpll_hz / (src_clk_div as u64)
                 }
             }
-            654 => {
-                // CLK_TSADC
+            CLK_TSADC => {
                 if OSC_HZ % rate_hz == 0 {
                     let src_clk_div = (OSC_HZ / rate_hz).min(255) as u32;
                     self.clrsetreg(
@@ -261,13 +257,13 @@ impl Cru {
     ///
     /// 参考 u-boot: drivers/clk/rockchip/clk_rk3588.c:rk3588_uart_get_rate()
     ///
-    /// 注意：仅支持 SCLK_UART1-9 (ID: 632-636)
+    /// 注意：仅支持 SCLK_UART0-3 (ID: 632-635)
     pub(crate) fn uart_get_rate(&self, id: ClkId) -> u64 {
-        let reg = match id.value() {
-            632 => 41, // SCLK_UART1
-            633 => 43, // SCLK_UART2
-            634 => 45, // SCLK_UART3
-            635 => 47, // SCLK_UART4
+        let reg = match id {
+            SCLK_UART0 => 41,
+            SCLK_UART1 => 43,
+            SCLK_UART2 => 45,
+            SCLK_UART3 => 47,
             _ => return 0,
         };
 
@@ -301,13 +297,13 @@ impl Cru {
     ///
     /// 参考 u-boot: drivers/clk/rockchip/clk_rk3588.c:rk3588_uart_set_rate()
     ///
-    /// 注意：仅支持 SCLK_UART1-4 (ID: 632-635)
+    /// 注意：仅支持 SCLK_UART0-3 (ID: 632-635)
     pub(crate) fn uart_set_rate(&mut self, id: ClkId, rate_hz: u64) -> u64 {
-        let reg = match id.value() {
-            632 => 41, // SCLK_UART1
-            633 => 43, // SCLK_UART2
-            634 => 45, // SCLK_UART3
-            635 => 47, // SCLK_UART4
+        let reg = match id {
+            SCLK_UART0 => 41,
+            SCLK_UART1 => 43,
+            SCLK_UART2 => 45,
+            SCLK_UART3 => 47,
             _ => return 0,
         };
 
@@ -379,23 +375,15 @@ impl Cru {
 
     /// 获取根时钟频率
     pub(crate) fn root_clk_get_rate(&self, id: ClkId) -> u64 {
-        match id.value() {
-            123 => {
-                // ACLK_BUS_ROOT
+        match id {
+            ACLK_BUS_ROOT => {
                 let clksel_38 = self.read(clksel_con(38) as u32);
                 let div = ((clksel_38 & 0x1F) + 1) as u64;
                 self.gpll_hz / div
             }
-            652 | 650 => {
-                // ACLK_TOP_ROOT / ACLK_LOW_TOP_ROOT
-                200 * MHZ
-            }
-            651 => {
-                // PCLK_TOP_ROOT
-                100 * MHZ
-            }
-            649 | 644 | 645 | 643 => {
-                // CENTER 相关根时钟
+            ACLK_TOP_ROOT | ACLK_LOW_TOP_ROOT => 200 * MHZ,
+            PCLK_TOP_ROOT => 100 * MHZ,
+            ACLK_CENTER_ROOT | PCLK_CENTER_ROOT | HCLK_CENTER_ROOT | ACLK_CENTER_LOW_ROOT => {
                 self.gpll_hz / 2
             }
             _ => OSC_HZ,
