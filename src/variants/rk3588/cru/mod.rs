@@ -2,6 +2,7 @@ use crate::{Mmio, grf::GrfMmio};
 
 pub mod clock;
 mod consts;
+mod error;
 mod peripheral;
 mod pll;
 
@@ -11,6 +12,7 @@ mod pll;
 
 pub use clock::*;
 pub use consts::*;
+pub use error::*;
 pub use pll::*;
 
 // =============================================================================
@@ -183,13 +185,13 @@ impl Cru {
         // - CPLL: CPLL_HZ (1500MHz)
         // - GPLL: GPLL_HZ (1188MHz)
         // ========================================================================
-        let cpll_actual = self.pll_get_rate(PllId::CPLL);
-        let gpll_actual = self.pll_get_rate(PllId::GPLL);
+        let cpll_actual = self.pll_get_rate(PllId::CPLL).unwrap();
+        let gpll_actual = self.pll_get_rate(PllId::GPLL).unwrap();
 
         // 保存实际读取到的频率
         self.cpll_hz = cpll_actual;
         self.gpll_hz = gpll_actual;
-        self.ppll_hz = self.pll_get_rate(PllId::PPLL);
+        self.ppll_hz = self.pll_get_rate(PllId::PPLL).unwrap();
 
         debug!("PLL actual rates (read from registers):");
         debug!("  - CPLL: {}MHz", cpll_actual / MHZ);
@@ -221,7 +223,7 @@ impl Cru {
     ///
     /// PLL 输出频率 (Hz)
     #[must_use]
-    fn pll_get_rate(&self, pll_id: PllId) -> u64 {
+    fn pll_get_rate(&self, pll_id: PllId) -> ClockResult<u64> {
         let pll_cfg = get_pll(pll_id);
 
         // 1. 读取 PLL 模式
@@ -243,7 +245,7 @@ impl Cru {
                     pll_id.name(),
                     mode_shift
                 );
-                return OSC_HZ;
+                return Ok(OSC_HZ);
             }
             pll_mode::PLL_MODE_DEEP => {
                 debug!(
@@ -251,19 +253,19 @@ impl Cru {
                     pll_id.name(),
                     mode_shift
                 );
-                return 32768;
+                return Ok(32768);
             }
             pll_mode::PLL_MODE_NORMAL => {
                 // 继续读取 PLL 参数
             }
             _ => {
                 log::warn!(
-                    "⚠️ {}[mode_shift={}]: unknown mode={}, returning OSC_HZ",
+                    "⚠️ {}[mode_shift={}]: unknown mode={}, returning 0",
                     pll_id.name(),
                     mode_shift,
                     mode
                 );
-                return OSC_HZ;
+                return Ok(0);
             }
         }
 
@@ -289,7 +291,7 @@ impl Cru {
                 "⚠️ PLL[mode_shift={}] has invalid p=0, assuming not configured, returning OSC_HZ",
                 mode_shift
             );
-            return OSC_HZ;
+            return Ok(OSC_HZ);
         }
 
         // 4. 计算频率 (参考 u-boot rk3588_pll_get_rate)
@@ -308,7 +310,7 @@ impl Cru {
 
         debug!("{}: calculated rate = {}MHz", pll_id.name(), rate / MHZ);
 
-        rate
+        Ok(rate)
     }
 
     /// 设置 PLL 频率
@@ -333,7 +335,7 @@ impl Cru {
     /// 5. Power up PLL
     /// 6. 等待 PLL 锁定
     /// 7. 切换到 NORMAL 模式
-    pub fn pll_set_rate(&mut self, pll_id: PllId, rate_hz: u64) -> Result<u64, &'static str> {
+    pub fn pll_set_rate(&mut self, pll_id: PllId, rate_hz: u64) -> ClockResult<u64> {
         let pll_cfg = get_pll(pll_id);
 
         info!(
@@ -346,7 +348,9 @@ impl Cru {
         // ========================================================================
         // 1. 查找或计算 PLL 参数 (p, m, s, k)
         // ========================================================================
-        let (p, m, s, k) = find_pll_params(pll_id, rate_hz)?;
+        let (p, m, s, k) = find_pll_params(pll_id, rate_hz).map_err(|e| {
+            ClockError::pll_config_error(crate::clock::ClkId::from(pll_id as u32), e)
+        })?;
 
         debug!(
             "{}: calculated params: p={}, m={}, s={}, k={}",
@@ -425,7 +429,10 @@ impl Cru {
         while self.read(con6_addr) & pllcon6::LOCK_STATUS == 0 {
             if timeout == 0 {
                 log::error!("⚠️ {}: PLL lock timeout!", pll_id.name());
-                return Err("PLL lock timeout");
+                return Err(ClockError::pll_config_error(
+                    crate::clock::ClkId::from(pll_id as u32),
+                    "PLL lock timeout",
+                ));
             }
             // 简单延迟循环 (裸机环境)
             for _ in 0..100 {
@@ -457,7 +464,7 @@ impl Cru {
         // ========================================================================
         // 8. 验证实际输出频率
         // ========================================================================
-        let actual_rate = self.pll_get_rate(pll_id);
+        let actual_rate = self.pll_get_rate(pll_id)?;
 
         log::info!(
             "✓ CRU@{:x}: {} set to {}MHz (requested: {}MHz)",
@@ -479,36 +486,36 @@ impl Cru {
     /// # 返回
     ///
     /// 返回时钟频率 (Hz)，如果不支持该时钟则返回错误
-    pub fn clk_get_rate(&self, id: crate::clock::ClkId) -> Result<u64, &'static str> {
+    pub fn clk_get_rate(&self, id: crate::clock::ClkId) -> ClockResult<u64> {
         // 1. PLL 时钟
         if is_pll_clk(id) {
-            let pll_id = PllId::try_from(id)?;
-            return Ok(self.pll_get_rate(pll_id));
+            let pll_id = PllId::try_from(id).map_err(|_| ClockError::unsupported(id))?;
+            return self.pll_get_rate(pll_id);
         }
 
         // 2. I2C 时钟
         if is_i2c_clk(id) {
-            return Ok(self.i2c_get_rate(id));
+            return self.i2c_get_rate(id);
         }
 
         // 3. UART 时钟
         if is_uart_clk(id) {
-            return Ok(self.uart_get_rate(id));
+            return self.uart_get_rate(id);
         }
 
         // 4. SPI 时钟
         if is_spi_clk(id) {
-            return Ok(self.spi_get_rate(id));
+            return self.spi_get_rate(id);
         }
 
         // 5. PWM 时钟
         if matches!(id, CLK_PWM1 | CLK_PWM2 | CLK_PWM3 | CLK_PMU1PWM) {
-            return Ok(self.pwm_get_rate(id));
+            return self.pwm_get_rate(id);
         }
 
         // 6. ADC 时钟
         if matches!(id, CLK_SARADC | CLK_TSADC) {
-            return Ok(self.adc_get_rate(id));
+            return self.adc_get_rate(id);
         }
 
         // 7. 根时钟
@@ -523,15 +530,18 @@ impl Cru {
                 | HCLK_CENTER_ROOT
                 | ACLK_CENTER_LOW_ROOT
         ) {
-            return Ok(self.root_clk_get_rate(id));
+            return self.root_clk_get_rate(id);
         }
 
         // 8. 固定时钟
         if matches!(id, CCLK_SRC_SDIO | CCLK_EMMC | BCLK_EMMC | SCLK_SFC) {
-            return Ok(self.mmc_get_rate(id));
+            return self.mmc_get_rate(id);
         }
 
-        Err("Clock type not supported yet")
+        Err(ClockError::rate_read_failed(
+            id,
+            "Clock type not supported yet",
+        ))
     }
 
     /// 设置时钟频率
@@ -544,44 +554,40 @@ impl Cru {
     /// # 返回
     ///
     /// 返回实际设置的频率 (Hz)，如果不支持该时钟则返回错误
-    pub fn clk_set_rate(
-        &mut self,
-        id: crate::clock::ClkId,
-        rate_hz: u64,
-    ) -> Result<u64, &'static str> {
+    pub fn clk_set_rate(&mut self, id: crate::clock::ClkId, rate_hz: u64) -> ClockResult<u64> {
         // 1. PLL 时钟
         if is_pll_clk(id) {
-            let pll_id = PllId::try_from(id)?;
+            let pll_id = PllId::try_from(id).map_err(|_| ClockError::unsupported(id))?;
             return self.pll_set_rate(pll_id, rate_hz);
         }
 
         // 2. I2C 时钟
         if is_i2c_clk(id) {
-            return Ok(self.i2c_set_rate(id, rate_hz));
+            return self.i2c_set_rate(id, rate_hz);
         }
 
         // 3. UART 时钟
         if is_uart_clk(id) {
-            return Ok(self.uart_set_rate(id, rate_hz));
+            return self.uart_set_rate(id, rate_hz);
         }
 
         // 4. SPI 时钟
         if is_spi_clk(id) {
-            return Ok(self.spi_set_rate(id, rate_hz));
+            return self.spi_set_rate(id, rate_hz);
         }
 
         // 5. PWM 时钟
         if matches!(id, CLK_PWM1 | CLK_PWM2 | CLK_PWM3 | CLK_PMU1PWM) {
-            return Ok(self.pwm_set_rate(id, rate_hz));
+            return self.pwm_set_rate(id, rate_hz);
         }
 
         // 6. ADC 时钟
         if matches!(id, CLK_SARADC | CLK_TSADC) {
-            return Ok(self.adc_set_rate(id, rate_hz));
+            return self.adc_set_rate(id, rate_hz);
         }
 
         // 其他时钟类型暂不支持设置
-        Err("Clock type not supported for rate setting yet")
+        Err(ClockError::invalid_rate(id, rate_hz))
     }
 
     // ========================================================================
