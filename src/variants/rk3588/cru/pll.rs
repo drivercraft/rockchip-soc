@@ -2,7 +2,16 @@
 //!
 //! 参考 u-boot-orangepi/drivers/clk/rockchip/clk_rk3588.c
 
-use crate::{clock::ClkId, clock::pll::*, rk3588::cru::consts::*};
+use crate::{
+    clock::{ClkId, pll::*},
+    rk3588::{
+        Cru,
+        cru::{ClockError, ClockResult, consts::*},
+    },
+};
+
+/// PLL 模式掩码
+const PLL_MODE_MASK: u32 = 0x3;
 
 /// RK3588 PLL 时钟 ID
 ///
@@ -172,6 +181,273 @@ const RK3588_PLL_CLOCKS: [PllClock; 9] = [
     // [8] PPLL - PMU PLL (偏移 0x8000)
     pll!(PPLL, pmu_pll_con(128), RK3588_MODE_CON0, 10, 15, 0),
 ];
+
+impl Cru {
+    /// 读取 PLL 实际频率
+    ///
+    /// 参考 u-boot: drivers/clk/rockchip/clk_pll.c:rk3588_pll_get_rate()
+    ///
+    /// # 参数
+    ///
+    /// * `pll_id` - PLL ID
+    ///
+    /// # 返回
+    ///
+    /// PLL 输出频率 (Hz)
+    pub(crate) fn pll_get_rate(&self, pll_id: PllId) -> ClockResult<u64> {
+        let pll_cfg = get_pll(pll_id);
+
+        // 1. 读取 PLL 模式
+        let mode_con = self.read(pll_cfg.mode_offset);
+        let mode_shift = pll_cfg.mode_shift;
+
+        // PPLL (ID=8) 特殊处理: 始终认为是 NORMAL 模式
+        let pll_id_val = pll_id as u32;
+        let mode = if pll_id_val == 8 {
+            pll_mode::PLL_MODE_NORMAL
+        } else {
+            (mode_con & (PLL_MODE_MASK << mode_shift)) >> mode_shift
+        };
+
+        match mode {
+            pll_mode::PLL_MODE_SLOW => {
+                debug!(
+                    "{}[mode_shift={}] is in SLOW mode, returning OSC_HZ",
+                    pll_id.name(),
+                    mode_shift
+                );
+                return Ok(OSC_HZ);
+            }
+            pll_mode::PLL_MODE_DEEP => {
+                debug!(
+                    "{}[mode_shift={}] is in DEEP mode, returning 32768Hz",
+                    pll_id.name(),
+                    mode_shift
+                );
+                return Ok(32768);
+            }
+            pll_mode::PLL_MODE_NORMAL => {
+                // 继续读取 PLL 参数
+            }
+            _ => {
+                log::warn!(
+                    "⚠️ {}[mode_shift={}]: unknown mode={}, returning 0",
+                    pll_id.name(),
+                    mode_shift,
+                    mode
+                );
+                return Ok(0);
+            }
+        }
+
+        // 2. 读取 PLL 参数 (参考 u-boot rk3588_pll_get_rate)
+        // PLLCON0: M (10 bits)
+        let con0 = self.read(pll_cfg.con_offset);
+        let m = (con0 & pllcon0::M_MASK) >> pllcon0::M_SHIFT;
+
+        // PLLCON1: P (6 bits), S (3 bits)
+        let con1 = self.read(pll_cfg.con_offset + pll_con(1));
+        let p = (con1 & pllcon1::P_MASK) >> pllcon1::P_SHIFT;
+        let s = (con1 & pllcon1::S_MASK) >> pllcon1::S_SHIFT;
+
+        // PLLCON2: K (16 bits)
+        let con2 = self.read(pll_cfg.con_offset + pll_con(2));
+        let k = (con2 & pllcon2::K_MASK) >> pllcon2::K_SHIFT;
+
+        debug!("{}: p={}, m={}, s={}, k={}", pll_id.name(), p, m, s, k);
+
+        // 3. 验证 p 值
+        if p == 0 {
+            log::warn!(
+                "⚠️ PLL[mode_shift={}] has invalid p=0, assuming not configured, returning OSC_HZ",
+                mode_shift
+            );
+            return Ok(OSC_HZ);
+        }
+
+        // 4. 计算频率 (参考 u-boot rk3588_pll_get_rate)
+        // rate = OSC_HZ / p * m
+        let mut rate: u64 = (OSC_HZ / p as u64) * m as u64;
+
+        // 如果有小数分频 k
+        if k != 0 {
+            // frac_rate = OSC_HZ * k / (p * 65536)
+            let frac_rate = (OSC_HZ * k as u64) / (p as u64 * 65536);
+            rate += frac_rate;
+        }
+
+        // 右移 s 位 (后分频)
+        rate >>= s;
+
+        debug!("{}: calculated rate = {}MHz", pll_id.name(), rate / MHZ);
+
+        Ok(rate)
+    }
+
+    /// 设置 PLL 频率
+    ///
+    /// 参考 u-boot: drivers/clk/rockchip/clk_pll.c:rk3588_pll_set_rate()
+    ///
+    /// # 参数
+    ///
+    /// * `pll_id` - PLL ID
+    /// * `rate_hz` - 目标频率 (Hz)
+    ///
+    /// # 返回
+    ///
+    /// 成功返回 Ok(实际频率), 失败返回 Err
+    ///
+    /// # 配置流程
+    ///
+    /// 1. 查找频率表或计算参数
+    /// 2. 切换到 SLOW 模式
+    /// 3. Power down PLL
+    /// 4. 写入 PLL 参数 (p, m, s, k)
+    /// 5. Power up PLL
+    /// 6. 等待 PLL 锁定
+    /// 7. 切换到 NORMAL 模式
+    pub fn pll_set_rate(&mut self, pll_id: PllId, rate_hz: u64) -> ClockResult<u64> {
+        let pll_cfg = get_pll(pll_id);
+
+        info!(
+            "CRU@{:x}: Setting {} to {}MHz...",
+            self.base,
+            pll_id.name(),
+            rate_hz / MHZ
+        );
+
+        // ========================================================================
+        // 1. 查找或计算 PLL 参数 (p, m, s, k)
+        // ========================================================================
+        let (p, m, s, k) = find_pll_params(pll_id, rate_hz).map_err(|e| {
+            ClockError::pll_config_error(crate::clock::ClkId::from(pll_id as u32), e)
+        })?;
+
+        debug!(
+            "{}: calculated params: p={}, m={}, s={}, k={}",
+            pll_id.name(),
+            p,
+            m,
+            s,
+            k
+        );
+
+        // ========================================================================
+        // 2. 切换到 SLOW 模式
+        // u-boot: rk_clrsetreg(base + pll->mode_offset,
+        //                      pll->mode_mask << pll->mode_shift,
+        //                      RKCLK_PLL_MODE_SLOW << pll->mode_shift);
+        // ========================================================================
+        self.clrsetreg(
+            pll_cfg.mode_offset,
+            PLL_MODE_MASK << pll_cfg.mode_shift,
+            pll_mode::PLL_MODE_SLOW << pll_cfg.mode_shift,
+        );
+
+        debug!("{}: switched to SLOW mode", pll_id.name());
+
+        // ========================================================================
+        // 3. Power down PLL
+        // u-boot: rk_setreg(base + pll->con_offset + RK3588_PLLCON(1),
+        //                   RK3588_PLLCON1_PWRDOWN);
+        // ========================================================================
+        self.setreg(pll_cfg.con_offset + pll_con(1), pllcon1::PWRDOWN);
+
+        // ========================================================================
+        // 4. 写入 PLL 参数
+        // u-boot: rk_clrsetreg(base + pll->con_offset, RK3588_PLLCON0_M_MASK,
+        //                      rate->m << RK3588_PLLCON0_M_SHIFT);
+        // ========================================================================
+
+        // 写入 M (10 bits)
+        self.clrsetreg(pll_cfg.con_offset, pllcon0::M_MASK, m << pllcon0::M_SHIFT);
+
+        // 写入 P (6 bits) 和 S (3 bits)
+        self.clrsetreg(
+            pll_cfg.con_offset + pll_con(1),
+            pllcon1::P_MASK | pllcon1::S_MASK,
+            (p << pllcon1::P_SHIFT) | (s << pllcon1::S_SHIFT),
+        );
+
+        // 写入 K (16 bits, 如果有小数分频)
+        if k != 0 {
+            self.clrsetreg(
+                pll_cfg.con_offset + pll_con(2),
+                pllcon2::K_MASK,
+                k << pllcon2::K_SHIFT,
+            );
+        }
+
+        debug!("{}: PLL parameters written", pll_id.name());
+
+        // ========================================================================
+        // 5. Power up PLL
+        // u-boot: rk_clrreg(base + pll->con_offset + RK3588_PLLCON(1),
+        //                   RK3588_PLLCON1_PWRDOWN);
+        // ========================================================================
+        self.clrreg(pll_cfg.con_offset + pll_con(1), pllcon1::PWRDOWN);
+
+        // ========================================================================
+        // 6. 等待 PLL 锁定
+        // u-boot: while (!(readl(base + pll->con_offset + RK3588_PLLCON(6)) &
+        //                  RK3588_PLLCON6_LOCK_STATUS)) {
+        //             udelay(1);
+        //         }
+        // ========================================================================
+        let mut timeout = 1000; // 1ms timeout (1000 * 1us)
+        let con6_addr = pll_cfg.con_offset + pll_con(6);
+
+        while self.read(con6_addr) & pllcon6::LOCK_STATUS == 0 {
+            if timeout == 0 {
+                log::error!("⚠️ {}: PLL lock timeout!", pll_id.name());
+                return Err(ClockError::pll_config_error(
+                    crate::clock::ClkId::from(pll_id as u32),
+                    "PLL lock timeout",
+                ));
+            }
+            // 简单延迟循环 (裸机环境)
+            for _ in 0..100 {
+                core::hint::spin_loop();
+            }
+            timeout -= 1;
+        }
+
+        debug!(
+            "{}: PLL locked after {} attempts",
+            pll_id.name(),
+            1000 - timeout
+        );
+
+        // ========================================================================
+        // 7. 切换到 NORMAL 模式
+        // u-boot: rk_clrsetreg(base + pll->mode_offset,
+        //                      pll->mode_mask << pll->mode_shift,
+        //                      RKCLK_PLL_MODE_NORMAL << pll->mode_shift);
+        // ========================================================================
+        self.clrsetreg(
+            pll_cfg.mode_offset,
+            PLL_MODE_MASK << pll_cfg.mode_shift,
+            pll_mode::PLL_MODE_NORMAL << pll_cfg.mode_shift,
+        );
+
+        debug!("{}: switched to NORMAL mode", pll_id.name());
+
+        // ========================================================================
+        // 8. 验证实际输出频率
+        // ========================================================================
+        let actual_rate = self.pll_get_rate(pll_id)?;
+
+        log::info!(
+            "✓ CRU@{:x}: {} set to {}MHz (requested: {}MHz)",
+            self.base,
+            pll_id.name(),
+            actual_rate / MHZ,
+            rate_hz / MHZ
+        );
+
+        Ok(actual_rate)
+    }
+}
 
 /// 创建 RK3588 PLL 速率表项
 ///
