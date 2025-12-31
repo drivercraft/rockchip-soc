@@ -360,10 +360,11 @@ impl Cru {
         //                      pll->mode_mask << pll->mode_shift,
         //                      RKCLK_PLL_MODE_SLOW << pll->mode_shift);
         // ========================================================================
-        let mode_con = self.read(pll_cfg.mode_offset);
-        let new_mode = (mode_con & !(PLL_MODE_MASK << pll_cfg.mode_shift))
-            | (pll_mode::PLL_MODE_SLOW << pll_cfg.mode_shift);
-        self.write(pll_cfg.mode_offset, new_mode);
+        self.clrsetreg(
+            pll_cfg.mode_offset,
+            PLL_MODE_MASK << pll_cfg.mode_shift,
+            pll_mode::PLL_MODE_SLOW << pll_cfg.mode_shift,
+        );
 
         debug!("{}: switched to SLOW mode", pll_id.name());
 
@@ -372,8 +373,7 @@ impl Cru {
         // u-boot: rk_setreg(base + pll->con_offset + RK3588_PLLCON(1),
         //                   RK3588_PLLCON1_PWRDOWN);
         // ========================================================================
-        let con1 = self.read(pll_cfg.con_offset + pll_con(1));
-        self.write(pll_cfg.con_offset + pll_con(1), con1 | pllcon1::PWRDOWN);
+        self.setreg(pll_cfg.con_offset + pll_con(1), pllcon1::PWRDOWN);
 
         // ========================================================================
         // 4. 写入 PLL 参数
@@ -382,22 +382,26 @@ impl Cru {
         // ========================================================================
 
         // 写入 M (10 bits)
-        let con0 = self.read(pll_cfg.con_offset);
-        let new_con0 = (con0 & !pllcon0::M_MASK) | (m << pllcon0::M_SHIFT);
-        self.write(pll_cfg.con_offset, new_con0);
+        self.clrsetreg(
+            pll_cfg.con_offset,
+            pllcon0::M_MASK,
+            m << pllcon0::M_SHIFT,
+        );
 
         // 写入 P (6 bits) 和 S (3 bits)
-        let con1_val = self.read(pll_cfg.con_offset + pll_con(1));
-        let new_con1 = (con1_val & !(pllcon1::P_MASK | pllcon1::S_MASK))
-            | (p << pllcon1::P_SHIFT)
-            | (s << pllcon1::S_SHIFT);
-        self.write(pll_cfg.con_offset + pll_con(1), new_con1);
+        self.clrsetreg(
+            pll_cfg.con_offset + pll_con(1),
+            pllcon1::P_MASK | pllcon1::S_MASK,
+            (p << pllcon1::P_SHIFT) | (s << pllcon1::S_SHIFT),
+        );
 
         // 写入 K (16 bits, 如果有小数分频)
         if k != 0 {
-            let con2 = self.read(pll_cfg.con_offset + pll_con(2));
-            let new_con2 = (con2 & !pllcon2::K_MASK) | (k << pllcon2::K_SHIFT);
-            self.write(pll_cfg.con_offset + pll_con(2), new_con2);
+            self.clrsetreg(
+                pll_cfg.con_offset + pll_con(2),
+                pllcon2::K_MASK,
+                k << pllcon2::K_SHIFT,
+            );
         }
 
         debug!("{}: PLL parameters written", pll_id.name());
@@ -407,8 +411,7 @@ impl Cru {
         // u-boot: rk_clrreg(base + pll->con_offset + RK3588_PLLCON(1),
         //                   RK3588_PLLCON1_PWRDOWN);
         // ========================================================================
-        let con1_pu = self.read(pll_cfg.con_offset + pll_con(1));
-        self.write(pll_cfg.con_offset + pll_con(1), con1_pu & !pllcon1::PWRDOWN);
+        self.clrreg(pll_cfg.con_offset + pll_con(1), pllcon1::PWRDOWN);
 
         // ========================================================================
         // 6. 等待 PLL 锁定
@@ -444,10 +447,11 @@ impl Cru {
         //                      pll->mode_mask << pll->mode_shift,
         //                      RKCLK_PLL_MODE_NORMAL << pll->mode_shift);
         // ========================================================================
-        let mode_con_final = self.read(pll_cfg.mode_offset);
-        let new_mode_final = (mode_con_final & !(PLL_MODE_MASK << pll_cfg.mode_shift))
-            | (pll_mode::PLL_MODE_NORMAL << pll_cfg.mode_shift);
-        self.write(pll_cfg.mode_offset, new_mode_final);
+        self.clrsetreg(
+            pll_cfg.mode_offset,
+            PLL_MODE_MASK << pll_cfg.mode_shift,
+            pll_mode::PLL_MODE_NORMAL << pll_cfg.mode_shift,
+        );
 
         debug!("{}: switched to NORMAL mode", pll_id.name());
 
@@ -550,9 +554,66 @@ impl Cru {
     /// * `value` - 要写入的值（已移位到正确位置）
     fn clksel_con_write(&mut self, index: u32, mask: u32, value: u32) {
         let reg_offset = clksel_con(index);
-        let current = self.read(reg_offset);
-        let new_value = (current & !mask) | (value & mask);
-        self.write(reg_offset, new_value);
+        // 使用 Rockchip 风格的 clrsetreg
+        self.clrsetreg(reg_offset, mask, value);
+    }
+
+    // ========================================================================
+    // Rockchip 寄存器操作辅助方法
+    // ========================================================================
+
+    /// Rockchip 风格的 clrsetreg 操作
+    ///
+    /// 参考 u-boot: arch/arm/include/asm/arch-rockchip/hardware.h
+    ///
+    /// Rockchip 寄存器使用特殊的写掩码机制:
+    /// - 高 16 位: 要清除的位掩码 (clr)
+    /// - 低 16 位: 要设置的值 (set)
+    ///
+    /// # 参数
+    ///
+    /// * `offset` - 寄存器偏移
+    /// * `clr` - 要清除的位掩码
+    /// * `set` - 要设置的值
+    ///
+    /// # 示例
+    ///
+    /// ```rust
+    /// // 清除 bit 5, 设置 bit 3
+    /// self.clrsetreg(reg_offset, 0x20, 0x08);
+    /// // 等价于: value = (current & ~0x20) | 0x08
+    /// ```
+    fn clrsetreg(&mut self, offset: u32, clr: u32, set: u32) {
+        // Rockchip 风格: (clr | set) << 16 | set
+        // 硬件会自动:
+        // 1. 清除高16位中为1的位
+        // 2. 设置低16位中为1的位
+        let value = ((clr | set) << 16) | set;
+        self.write(offset, value);
+    }
+
+    /// 清除寄存器位
+    ///
+    /// # 参数
+    ///
+    /// * `offset` - 寄存器偏移
+    /// * `clr` - 要清除的位掩码
+    fn clrreg(&mut self, offset: u32, clr: u32) {
+        // Rockchip 风格: clr << 16
+        let value = clr << 16;
+        self.write(offset, value);
+    }
+
+    /// 设置寄存器位
+    ///
+    /// # 参数
+    ///
+    /// * `offset` - 寄存器偏移
+    /// * `set` - 要设置的值
+    fn setreg(&mut self, offset: u32, set: u32) {
+        // Rockchip 风格: (set << 16) | set
+        let value = (set << 16) | set;
+        self.write(offset, value);
     }
 
     pub fn grf_mmio_ls() -> &'static [GrfMmio] {
