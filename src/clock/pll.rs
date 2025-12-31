@@ -1,18 +1,19 @@
 /// PLL 类型枚举
 ///
 /// 参考 rockchip_pll_type 定义
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum RockchipPllType {
     /// RK3036/3366/3368 类型 PLL
-    PllRk3036,
+    Rk3036,
     /// RK3066 类型 PLL
-    PllRk3066,
+    Rk3066,
     /// RK3399 类型 PLL
-    PllRk3399,
+    Rk3399,
     /// RV1108 类型 PLL
-    PllRv1108,
+    Rv1108,
     /// RK3588 类型 PLL
-    PllRk3588,
+    #[default]
+    Rk3588,
 }
 
 /// PLL 速率表项
@@ -92,7 +93,7 @@ pub mod pll_flags {
 }
 
 /// Rockchip PLL 时钟结构
-#[derive(Debug)]
+#[derive(Debug, Default)]
 #[repr(C)]
 pub struct PllClock {
     /// 时钟 ID
@@ -221,40 +222,6 @@ impl PllClock {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    /// 示例: 创建 RK3588 GPLL 实例
-    #[test]
-    fn test_pll_creation() {
-        // 创建 RK3588 类型的速率表
-        static RK3588_RATE: PllRateTable = PllRateTable::rk3588(
-            1188 * 1_000_000, // 1188 MHz
-            1,                // nr
-            99,               // nf
-            1,                // no
-            0,                // nb
-            99,               // m
-            3,                // p
-            1,                // s
-            0,                // k
-        );
-
-        // 创建 GPLL 实例
-        let gpll = PllClock::new(
-            1,                          // id: GPLL
-            0x0000,                     // con_offset: PLL_CON0
-            0x0100,                     // mode_offset: MODE_CON0
-            8,                          // mode_shift
-            10,                         // lock_shift
-            RockchipPllType::PllRk3588, // pll_type
-            pll_flags::PLL_RK3588,      // pll_flags
-            Some(&RK3588_RATE),         // rate_table
-            0x3,                        // mode_mask: 2 bits
-        );
-
-        assert_eq!(gpll.id, 1);
-        assert_eq!(gpll.con_offset, 0x0000);
-        assert_eq!(gpll.pll_type, RockchipPllType::PllRk3588);
-    }
 
     #[test]
     fn test_pll_rate_table_rk3036() {

@@ -176,7 +176,7 @@ impl Cru {
     }
 
     pub fn grf_mmio_ls() -> &'static [GrfMmio] {
-        &[syscon::grf_mmio::SYS_GRF]
+        &[super::syscon::grf_mmio::SYS_GRF]
     }
 
     fn reg(&self, offset: usize) -> *mut u32 {

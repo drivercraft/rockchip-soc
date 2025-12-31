@@ -214,6 +214,7 @@ const fn shift_mask(shift: u32, width: u32) -> u32 {
 
 // CRU_CLK_SEL8_CON - 顶层时钟配置
 pub mod clk_sel8 {
+    use super::*;
     pub const ACLK_LOW_TOP_ROOT_SRC_SEL_SHIFT: u32 = 14;
     pub const ACLK_LOW_TOP_ROOT_SRC_SEL_MASK: u32 = shift_mask(14, 1);
     pub const ACLK_LOW_TOP_ROOT_SRC_SEL_GPLL: u32 = 0;
@@ -240,6 +241,7 @@ pub mod clk_sel8 {
 
 // CRU_CLK_SEL9_CON - 顶层时钟分频
 pub mod clk_sel9 {
+    use super::*;
     pub const ACLK_TOP_S400_SEL_SHIFT: u32 = 8;
     pub const ACLK_TOP_S400_SEL_MASK: u32 = shift_mask(8, 2);
     pub const ACLK_TOP_S400_SEL_400M: u32 = 0;
@@ -253,6 +255,7 @@ pub mod clk_sel9 {
 
 // CRU_CLK_SEL38_CON - I2C 和总线时钟
 pub mod clk_sel38 {
+    use super::*;
     pub const CLK_I2C8_SEL_SHIFT: u32 = 13;
     pub const CLK_I2C8_SEL_MASK: u32 = 1 << 13;
 
@@ -288,6 +291,7 @@ pub mod clk_sel38 {
 
 // CRU_CLK_SEL40_CON - SARADC 时钟
 pub mod clk_sel40 {
+    use super::*;
     pub const CLK_SARADC_SEL_SHIFT: u32 = 14;
     pub const CLK_SARADC_SEL_MASK: u32 = 1 << 14;
     pub const CLK_SARADC_SEL_GPLL: u32 = 0;
@@ -299,6 +303,7 @@ pub mod clk_sel40 {
 
 // CRU_CLK_SEL41_CON - UART 和 TSADC 时钟
 pub mod clk_sel41 {
+    use super::*;
     pub const CLK_UART_SRC_SEL_SHIFT: u32 = 14;
     pub const CLK_UART_SRC_SEL_MASK: u32 = 1 << 14;
     pub const CLK_UART_SRC_SEL_GPLL: u32 = 0;
@@ -327,6 +332,7 @@ pub mod clk_sel42 {
 
 // CRU_CLK_SEL43_CON - UART 时钟选择
 pub mod clk_sel43 {
+    use super::*;
     pub const CLK_UART_SEL_SHIFT: u32 = 0;
     pub const CLK_UART_SEL_MASK: u32 = shift_mask(0, 2);
     pub const CLK_UART_SEL_SRC: u32 = 0;
@@ -336,6 +342,7 @@ pub mod clk_sel43 {
 
 // CRU_CLK_SEL59_CON - SPI 和 PWM 时钟
 pub mod clk_sel59 {
+    use super::*;
     pub const CLK_PWM2_SEL_SHIFT: u32 = 14;
     pub const CLK_PWM2_SEL_MASK: u32 = shift_mask(14, 2);
 
@@ -364,6 +371,7 @@ pub mod clk_sel59 {
 
 // CRU_CLK_SEL60_CON - PWM3 时钟
 pub mod clk_sel60 {
+    use super::*;
     pub const CLK_PWM3_SEL_SHIFT: u32 = 0;
     pub const CLK_PWM3_SEL_MASK: u32 = shift_mask(0, 2);
 
@@ -374,6 +382,7 @@ pub mod clk_sel60 {
 
 // CRU_CLK_SEL62_CON - DECOM 显示时钟
 pub mod clk_sel62 {
+    use super::*;
     pub const DCLK_DECOM_SEL_SHIFT: u32 = 5;
     pub const DCLK_DECOM_SEL_MASK: u32 = 1 << 5;
     pub const DCLK_DECOM_SEL_GPLL: u32 = 0;
@@ -385,6 +394,7 @@ pub mod clk_sel62 {
 
 // CRU_CLK_SEL77_CON - EMMC 时钟
 pub mod clk_sel77 {
+    use super::*;
     pub const CCLK_EMMC_SEL_SHIFT: u32 = 14;
     pub const CCLK_EMMC_SEL_MASK: u32 = shift_mask(14, 2);
     pub const CCLK_EMMC_SEL_GPLL: u32 = 0;
@@ -397,6 +407,7 @@ pub mod clk_sel77 {
 
 // CRU_CLK_SEL78_CON - SFC 和 EMMC 总线时钟
 pub mod clk_sel78 {
+    use super::*;
     pub const SCLK_SFC_SEL_SHIFT: u32 = 12;
     pub const SCLK_SFC_SEL_MASK: u32 = shift_mask(12, 2);
     pub const SCLK_SFC_SEL_GPLL: u32 = 0;
@@ -417,6 +428,7 @@ pub mod clk_sel78 {
 
 // CRU_CLK_SEL81_CON - GMAC PTP 时钟
 pub mod clk_sel81 {
+    use super::*;
     pub const CLK_GMAC1_PTP_SEL_SHIFT: u32 = 13;
     pub const CLK_GMAC1_PTP_SEL_MASK: u32 = 1 << 13;
     pub const CLK_GMAC1_PTP_SEL_CPLL: u32 = 0;
@@ -434,6 +446,7 @@ pub mod clk_sel81 {
 
 // CRU_CLK_SEL83_CON - GMAC 125M 时钟
 pub mod clk_sel83 {
+    use super::*;
     pub const CLK_GMAC_125M_SEL_SHIFT: u32 = 15;
     pub const CLK_GMAC_125M_SEL_MASK: u32 = 1 << 15;
     pub const CLK_GMAC_125M_SEL_GPLL: u32 = 0;
@@ -445,6 +458,7 @@ pub mod clk_sel83 {
 
 // CRU_CLK_SEL84_CON - GMAC 50M 时钟
 pub mod clk_sel84 {
+    use super::*;
     pub const CLK_GMAC_50M_SEL_SHIFT: u32 = 7;
     pub const CLK_GMAC_50M_SEL_MASK: u32 = 1 << 7;
     pub const CLK_GMAC_50M_SEL_GPLL: u32 = 0;
@@ -456,6 +470,7 @@ pub mod clk_sel84 {
 
 // CRU_CLK_SEL110_CON - VOP 显示时钟
 pub mod clk_sel110 {
+    use super::*;
     pub const HCLK_VOP_ROOT_SEL_SHIFT: u32 = 10;
     pub const HCLK_VOP_ROOT_SEL_MASK: u32 = shift_mask(10, 2);
     pub const HCLK_VOP_ROOT_SEL_200M: u32 = 0;
@@ -484,6 +499,7 @@ pub mod clk_sel110 {
 
 // CRU_CLK_SEL111_CON - VOP 显示时钟源
 pub mod clk_sel111 {
+    use super::*;
     pub const DCLK1_VOP_SRC_SEL_SHIFT: u32 = 14;
     pub const DCLK1_VOP_SRC_SEL_MASK: u32 = shift_mask(14, 2);
 
@@ -503,6 +519,8 @@ pub mod clk_sel111 {
 
 // CRU_CLK_SEL112_CON - VOP 显示时钟输出
 pub mod clk_sel112 {
+    use super::*;
+
     pub const DCLK2_VOP_SEL_SHIFT: u32 = 11;
     pub const DCLK2_VOP_SEL_MASK: u32 = shift_mask(11, 2);
 
@@ -521,6 +539,7 @@ pub mod clk_sel112 {
 
 // CRU_CLK_SEL113_CON - VOP DCLK3 时钟
 pub mod clk_sel113 {
+    use super::*;
     pub const DCLK3_VOP_SRC_SEL_SHIFT: u32 = 7;
     pub const DCLK3_VOP_SRC_SEL_MASK: u32 = shift_mask(7, 2);
 
@@ -530,6 +549,7 @@ pub mod clk_sel113 {
 
 // CRU_CLK_SEL117_CON - 辅助 16MHz 时钟
 pub mod clk_sel117 {
+    use super::*;
     pub const CLK_AUX16MHZ_1_DIV_SHIFT: u32 = 8;
     pub const CLK_AUX16MHZ_1_DIV_MASK: u32 = shift_mask(8, 8);
 
@@ -539,6 +559,7 @@ pub mod clk_sel117 {
 
 // CRU_CLK_SEL165_CON - 中心根时钟
 pub mod clk_sel165 {
+    use super::*;
     pub const PCLK_CENTER_ROOT_SEL_SHIFT: u32 = 6;
     pub const PCLK_CENTER_ROOT_SEL_MASK: u32 = shift_mask(6, 2);
     pub const PCLK_CENTER_ROOT_SEL_200M: u32 = 0;
@@ -570,6 +591,7 @@ pub mod clk_sel165 {
 
 // CRU_CLK_SEL172_CON - SDIO 时钟
 pub mod clk_sel172 {
+    use super::*;
     pub const CCLK_SDIO_SRC_SEL_SHIFT: u32 = 8;
     pub const CCLK_SDIO_SRC_SEL_MASK: u32 = shift_mask(8, 2);
     pub const CCLK_SDIO_SRC_SEL_GPLL: u32 = 0;
@@ -582,6 +604,7 @@ pub mod clk_sel172 {
 
 // CRU_CLK_SEL176_CON - PCIe PHY PLL 分频
 pub mod clk_sel176 {
+    use super::*;
     pub const CLK_PCIE_PHY1_PLL_DIV_SHIFT: u32 = 6;
     pub const CLK_PCIE_PHY1_PLL_DIV_MASK: u32 = shift_mask(6, 6);
 
@@ -591,6 +614,7 @@ pub mod clk_sel176 {
 
 // CRU_CLK_SEL177_CON - PCIe PHY 参考时钟
 pub mod clk_sel177 {
+    use super::*;
     pub const CLK_PCIE_PHY2_REF_SEL_SHIFT: u32 = 8;
     pub const CLK_PCIE_PHY2_REF_SEL_MASK: u32 = 1 << 8;
 
@@ -609,6 +633,7 @@ pub mod clk_sel177 {
 
 // PMUCRU_CLK_SEL2_CON - PMU PWM1 时钟
 pub mod pmu_clk_sel2 {
+    use super::*;
     pub const CLK_PMU1PWM_SEL_SHIFT: u32 = 9;
     pub const CLK_PMU1PWM_SEL_MASK: u32 = shift_mask(9, 2);
 }

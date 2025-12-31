@@ -1,6 +1,7 @@
 use crate::{Mmio, grf::GrfMmio};
 
 mod syscon;
+mod cru;
 
 // =============================================================================
 // 常量定义
@@ -99,7 +100,10 @@ impl Cru {
     /// 3. ACLK_TOP_S400 是否配置为 400MHz
     /// 4. ACLK_TOP_S200 是否配置为 200MHz
     pub fn init(&mut self) {
-        log::info!("CRU@{:x}: Verifying clock configuration from bootloader", self.base);
+        debug!(
+            "CRU@{:x}: Verifying clock configuration",
+            self.base
+        );
 
         // Step 1: 读取 PLL 实际频率
         // CPLL: mode_shift=8, con_offset=104
@@ -107,7 +111,7 @@ impl Cru {
         // GPLL: mode_shift=2, con_offset=112
         self.gpll_hz = self.get_pll_rate(2, 112);
 
-        log::info!(
+        debug!(
             "CRU@{:x}: PLL frequencies: CPLL={}MHz, GPLL={}MHz",
             self.base,
             self.cpll_hz / MHZ,
@@ -119,29 +123,30 @@ impl Cru {
         let bus_root_sel = (clksel_38 & ACLK_BUS_ROOT_SEL_MASK) >> ACLK_BUS_ROOT_SEL_SHIFT;
         let bus_root_div = (clksel_38 & ACLK_BUS_ROOT_DIV_MASK) >> ACLK_BUS_ROOT_DIV_SHIFT;
 
-        log::info!(
+        debug!(
             "CRU@{:x}: ACLK_BUS_ROOT (clksel_con[38]): 0x{:08x}",
-            self.base,
-            clksel_38
+            self.base, clksel_38
         );
-        log::info!(
-            "  - SEL: {} (0=GPLL, 1=CPLL)",
-            bus_root_sel
-        );
-        log::info!(
+        debug!("  - SEL: {} (0=GPLL, 1=CPLL)", bus_root_sel);
+        debug!(
             "  - DIV: {} (output: ~{}MHz)",
             bus_root_div,
             if bus_root_div > 0 {
-                let src = if bus_root_sel == 0 { self.gpll_hz } else { self.cpll_hz };
+                let src = if bus_root_sel == 0 {
+                    self.gpll_hz
+                } else {
+                    self.cpll_hz
+                };
                 src / (bus_root_div as u64 * MHZ)
-            } else { 0 }
+            } else {
+                0
+            }
         );
 
         if bus_root_sel != ACLK_BUS_ROOT_SEL_GPLL {
-            log::warn!(
+            warn!(
                 "⚠ CRU@{:x}: ACLK_BUS_ROOT source is not GPLL! (current: {})",
-                self.base,
-                bus_root_sel
+                self.base, bus_root_sel
             );
         }
 
@@ -150,22 +155,15 @@ impl Cru {
         let s400_sel = (clksel_9 & ACLK_TOP_S400_SEL_MASK) >> ACLK_TOP_S400_SEL_SHIFT;
         let s200_sel = (clksel_9 & ACLK_TOP_S200_SEL_MASK) >> ACLK_TOP_S200_SEL_SHIFT;
 
-        log::info!(
+        debug!(
             "CRU@{:x}: ACLK_TOP (clksel_con[9]): 0x{:08x}",
-            self.base,
-            clksel_9
+            self.base, clksel_9
         );
-        log::info!(
-            "  - S400_SEL: {} (0=400MHz, 1=200MHz)",
-            s400_sel
-        );
-        log::info!(
-            "  - S200_SEL: {} (0=200MHz, 1=100MHz)",
-            s200_sel
-        );
+        debug!("  - S400_SEL: {} (0=400MHz, 1=200MHz)", s400_sel);
+        debug!("  - S200_SEL: {} (0=200MHz, 1=100MHz)", s200_sel);
 
         if s400_sel != ACLK_TOP_S400_SEL_400M {
-            log::warn!(
+            warn!(
                 "⚠ CRU@{:x}: ACLK_TOP_S400 not set to 400MHz! (current: {})",
                 self.base,
                 s400_sel
@@ -173,14 +171,13 @@ impl Cru {
         }
 
         if s200_sel != ACLK_TOP_S200_SEL_200M {
-            log::warn!(
+            warn!(
                 "⚠ CRU@{:x}: ACLK_TOP_S200 not set to 200MHz! (current: {})",
-                self.base,
-                s200_sel
+                self.base, s200_sel
             );
         }
 
-        log::info!("✓ CRU@{:x}: Clock configuration verified", self.base);
+        info!("✓ CRU@{:x}: Clock configuration verified", self.base);
     }
 
     /// 读取 PLL 频率
@@ -202,18 +199,31 @@ impl Cru {
 
         match mode {
             PLL_MODE_SLOW => {
-                log::debug!("CRU@{:x}: PLL[mode_shift={}] in SLOW mode, returning OSC_HZ", self.base, mode_shift);
+                log::debug!(
+                    "CRU@{:x}: PLL[mode_shift={}] in SLOW mode, returning OSC_HZ",
+                    self.base,
+                    mode_shift
+                );
                 return OSC_HZ;
             }
             PLL_MODE_DEEP => {
-                log::warn!("CRU@{:x}: PLL[mode_shift={}] in DEEP mode, returning 32768Hz", self.base, mode_shift);
+                log::warn!(
+                    "CRU@{:x}: PLL[mode_shift={}] in DEEP mode, returning 32768Hz",
+                    self.base,
+                    mode_shift
+                );
                 return 32768;
             }
             PLL_MODE_NORMAL => {
                 // 正常模式，读取 PLL 参数
             }
             _ => {
-                log::warn!("CRU@{:x}: PLL[mode_shift={}] unknown mode {}, returning OSC_HZ", self.base, mode_shift, mode);
+                log::warn!(
+                    "CRU@{:x}: PLL[mode_shift={}] unknown mode {}, returning OSC_HZ",
+                    self.base,
+                    mode_shift,
+                    mode
+                );
                 return OSC_HZ;
             }
         }
