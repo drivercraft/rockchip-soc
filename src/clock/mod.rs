@@ -32,4 +32,8 @@ impl ClkId {
     pub const fn value(&self) -> u64 {
         self.0
     }
+
+    pub const fn new(value: u64) -> Self {
+        ClkId(value)
+    }
 }

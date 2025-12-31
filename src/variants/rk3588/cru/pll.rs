@@ -2,35 +2,63 @@
 //!
 //! 参考 u-boot-orangepi/drivers/clk/rockchip/clk_rk3588.c
 
-use crate::{clock::pll::*, rk3588::cru::consts::*};
+use crate::{clock::ClkId, clock::pll::*, rk3588::cru::consts::*};
 
 /// RK3588 PLL 时钟 ID
 ///
 /// 对应 u-boot 中的 enum rk3588_pll_id (cru_rk3588.h:22)
+/// 值与 ClkId 保持一致
 #[allow(clippy::upper_case_acronyms)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(usize)]
+#[repr(u64)]
 pub enum PllId {
     /// BIGCORE0 PLL - 大核0 PLL
     B0PLL = 1,
     /// BIGCORE1 PLL - 大核1 PLL
-    B1PLL,
+    B1PLL = 2,
     /// DSU PLL - 小核共享单元 PLL
-    LPLL,
-    /// 中心/通用 PLL
-    CPLL,
-    /// 通用 PLL
-    GPLL,
-    /// 网络/视频 PLL
-    NPLL,
+    LPLL = 3,
     /// 视频 PLL
-    V0PLL,
+    V0PLL = 4,
     /// 音频 PLL
-    AUPLL,
+    AUPLL = 5,
+    /// 中心/通用 PLL
+    CPLL = 6,
+    /// 通用 PLL
+    GPLL = 7,
+    /// 网络/视频 PLL
+    NPLL = 8,
     /// PMU PLL
-    PPLL,
-    /// PLL 总数
-    _Len,
+    PPLL = 9,
+}
+
+// =============================================================================
+// PllId 与 ClkId 的双向转换
+// =============================================================================
+
+impl From<PllId> for ClkId {
+    fn from(pll_id: PllId) -> Self {
+        ClkId::new(pll_id as u64)
+    }
+}
+
+impl TryFrom<ClkId> for PllId {
+    type Error = &'static str;
+
+    fn try_from(clk_id: ClkId) -> Result<Self, Self::Error> {
+        match clk_id.value() {
+            1 => Ok(PllId::B0PLL),
+            2 => Ok(PllId::B1PLL),
+            3 => Ok(PllId::LPLL),
+            4 => Ok(PllId::V0PLL),
+            5 => Ok(PllId::AUPLL),
+            6 => Ok(PllId::CPLL),
+            7 => Ok(PllId::GPLL),
+            8 => Ok(PllId::NPLL),
+            9 => Ok(PllId::PPLL),
+            _ => Err("Invalid PLL clock ID"),
+        }
+    }
 }
 
 impl PllId {
@@ -41,13 +69,12 @@ impl PllId {
             Self::B0PLL => "B0PLL",
             Self::B1PLL => "B1PLL",
             Self::LPLL => "LPLL",
+            Self::V0PLL => "V0PLL",
+            Self::AUPLL => "AUPLL",
             Self::CPLL => "CPLL",
             Self::GPLL => "GPLL",
             Self::NPLL => "NPLL",
-            Self::V0PLL => "V0PLL",
-            Self::AUPLL => "AUPLL",
             Self::PPLL => "PPLL",
-            Self::_Len => "INVALID",
         }
     }
 
@@ -125,23 +152,23 @@ macro_rules! pll {
 /// - PPLL: PMU PLL
 ///
 /// 注意: 数组顺序必须与 PllId 枚举顺序一致
-const RK3588_PLL_CLOCKS: [PllClock; PllId::_Len as usize - 1] = [
+const RK3588_PLL_CLOCKS: [PllClock; 9] = [
     // [0] B0PLL - BIGCORE0 PLL (偏移 0x50000)
     pll!(B0PLL, b0_pll_con(0), RK3588_B0_PLL_MODE_CON, 0, 15, 0),
     // [1] B1PLL - BIGCORE1 PLL (偏移 0x52000)
     pll!(B1PLL, b1_pll_con(8), RK3588_B1_PLL_MODE_CON, 0, 15, 0),
     // [2] LPLL - DSU PLL (偏移 0x58000)
     pll!(LPLL, lpll_con(16), RK3588_LPLL_MODE_CON, 0, 15, 0),
-    // [3] CPLL - 中心/通用 PLL (偏移 0x1a0)
-    pll!(CPLL, pll_con(104), RK3588_MODE_CON0, 8, 15, 0),
-    // [4] GPLL - 通用 PLL (偏移 0x1c0)
-    pll!(GPLL, pll_con(112), RK3588_MODE_CON0, 2, 15, 0),
-    // [5] NPLL - 网络/视频 PLL (偏移 0x1e0)
-    pll!(NPLL, pll_con(120), RK3588_MODE_CON0, 0, 15, 0),
-    // [6] V0PLL - 视频 PLL (偏移 0x160)
+    // [3] V0PLL - 视频 PLL (偏移 0x160)
     pll!(V0PLL, pll_con(88), RK3588_MODE_CON0, 4, 15, 0),
-    // [7] AUPLL - 音频 PLL (偏移 0x180)
+    // [4] AUPLL - 音频 PLL (偏移 0x180)
     pll!(AUPLL, pll_con(96), RK3588_MODE_CON0, 6, 15, 0),
+    // [5] CPLL - 中心/通用 PLL (偏移 0x1a0)
+    pll!(CPLL, pll_con(104), RK3588_MODE_CON0, 8, 15, 0),
+    // [6] GPLL - 通用 PLL (偏移 0x1c0)
+    pll!(GPLL, pll_con(112), RK3588_MODE_CON0, 2, 15, 0),
+    // [7] NPLL - 网络/视频 PLL (偏移 0x1e0)
+    pll!(NPLL, pll_con(120), RK3588_MODE_CON0, 0, 15, 0),
     // [8] PPLL - PMU PLL (偏移 0x8000)
     pll!(PPLL, pmu_pll_con(128), RK3588_MODE_CON0, 10, 15, 0),
 ];
@@ -327,23 +354,21 @@ mod tests {
     #[test]
     fn test_pll_count() {
         // RK3588 应该有 9 个 PLL
-        // PllId 从 1 开始,所以 _Len = 10 (1-9 + _Len)
         assert_eq!(RK3588_PLL_CLOCKS.len(), 9);
-        assert_eq!(PllId::_Len as usize, 10);
     }
 
     #[test]
     fn test_pll_ids() {
         // 验证 PLL ID 值 (匹配设备树绑定 rk3588-cru.h)
-        assert_eq!(PllId::B0PLL as usize, 1);
-        assert_eq!(PllId::B1PLL as usize, 2);
-        assert_eq!(PllId::LPLL as usize, 3);
-        assert_eq!(PllId::CPLL as usize, 4);
-        assert_eq!(PllId::GPLL as usize, 5);
-        assert_eq!(PllId::NPLL as usize, 6);
-        assert_eq!(PllId::V0PLL as usize, 7);
-        assert_eq!(PllId::AUPLL as usize, 8);
-        assert_eq!(PllId::PPLL as usize, 9);
+        assert_eq!(PllId::B0PLL as u64, 1);
+        assert_eq!(PllId::B1PLL as u64, 2);
+        assert_eq!(PllId::LPLL as u64, 3);
+        assert_eq!(PllId::V0PLL as u64, 4);
+        assert_eq!(PllId::AUPLL as u64, 5);
+        assert_eq!(PllId::CPLL as u64, 6);
+        assert_eq!(PllId::GPLL as u64, 7);
+        assert_eq!(PllId::NPLL as u64, 8);
+        assert_eq!(PllId::PPLL as u64, 9);
     }
 
     #[test]
@@ -467,7 +492,7 @@ mod tests {
         // 对应 C 代码: PLL(pll_rk3588, PLL_V0PLL, RK3588_PLL_CON(88), RK3588_MODE_CON0, 4, 15, 0, ...)
         let pll = get_pll(PllId::V0PLL);
 
-        assert_eq!(pll.id, 7, "V0PLL ID should be 7");
+        assert_eq!(pll.id, 4, "V0PLL ID should be 4");
 
         // RK3588_PLL_CON(88) = 88 * 0x4 = 0x160
         assert_eq!(pll.con_offset, 0x160, "V0PLL con_offset should be 0x160");
@@ -485,7 +510,7 @@ mod tests {
         // 对应 C 代码: PLL(pll_rk3588, PLL_AUPLL, RK3588_PLL_CON(96), RK3588_MODE_CON0, 6, 15, 0, ...)
         let pll = get_pll(PllId::AUPLL);
 
-        assert_eq!(pll.id, 8, "AUPLL ID should be 8");
+        assert_eq!(pll.id, 5, "AUPLL ID should be 5");
 
         // RK3588_PLL_CON(96) = 96 * 0x4 = 0x180
         assert_eq!(pll.con_offset, 0x180, "AUPLL con_offset should be 0x180");
@@ -501,7 +526,7 @@ mod tests {
         // 对应 C 代码: PLL(pll_rk3588, PLL_CPLL, RK3588_PLL_CON(104), RK3588_MODE_CON0, 8, 15, 0, ...)
         let pll = get_pll(PllId::CPLL);
 
-        assert_eq!(pll.id, 4, "CPLL ID should be 4");
+        assert_eq!(pll.id, 6, "CPLL ID should be 6");
 
         // RK3588_PLL_CON(104) = 104 * 0x4 = 0x1a0
         assert_eq!(pll.con_offset, 0x1a0, "CPLL con_offset should be 0x1a0");
@@ -517,7 +542,7 @@ mod tests {
         // 对应 C 代码: PLL(pll_rk3588, PLL_GPLL, RK3588_PLL_CON(112), RK3588_MODE_CON0, 2, 15, 0, ...)
         let pll = get_pll(PllId::GPLL);
 
-        assert_eq!(pll.id, 5, "GPLL ID should be 5");
+        assert_eq!(pll.id, 7, "GPLL ID should be 7");
 
         // RK3588_PLL_CON(112) = 112 * 0x4 = 0x1c0
         assert_eq!(pll.con_offset, 0x1c0, "GPLL con_offset should be 0x1c0");
@@ -533,7 +558,7 @@ mod tests {
         // 对应 C 代码: PLL(pll_rk3588, PLL_NPLL, RK3588_PLL_CON(120), RK3588_MODE_CON0, 0, 15, 0, ...)
         let pll = get_pll(PllId::NPLL);
 
-        assert_eq!(pll.id, 6, "NPLL ID should be 6");
+        assert_eq!(pll.id, 8, "NPLL ID should be 8");
 
         // RK3588_PLL_CON(120) = 120 * 0x4 = 0x1e0
         assert_eq!(pll.con_offset, 0x1e0, "NPLL con_offset should be 0x1e0");
@@ -668,31 +693,31 @@ mod tests {
         assert_eq!(pll.mode_offset, RK3588_LPLL_MODE_CON);
         assert_eq!((pll.mode_shift, pll.lock_shift, pll.pll_flags), (0, 15, 0));
 
-        // V0PLL: PLL_V0PLL = 7
+        // V0PLL: PLL_V0PLL = 4
         let pll = get_pll(PllId::V0PLL);
         assert_eq!(pll.con_offset, pll_con(88));
         assert_eq!(pll.mode_offset, RK3588_MODE_CON0);
         assert_eq!((pll.mode_shift, pll.lock_shift, pll.pll_flags), (4, 15, 0));
 
-        // AUPLL: PLL_AUPLL = 8
+        // AUPLL: PLL_AUPLL = 5
         let pll = get_pll(PllId::AUPLL);
         assert_eq!(pll.con_offset, pll_con(96));
         assert_eq!(pll.mode_offset, RK3588_MODE_CON0);
         assert_eq!((pll.mode_shift, pll.lock_shift, pll.pll_flags), (6, 15, 0));
 
-        // CPLL: PLL_CPLL = 4
+        // CPLL: PLL_CPLL = 6
         let pll = get_pll(PllId::CPLL);
         assert_eq!(pll.con_offset, pll_con(104));
         assert_eq!(pll.mode_offset, RK3588_MODE_CON0);
         assert_eq!((pll.mode_shift, pll.lock_shift, pll.pll_flags), (8, 15, 0));
 
-        // GPLL: PLL_GPLL = 5
+        // GPLL: PLL_GPLL = 7
         let pll = get_pll(PllId::GPLL);
         assert_eq!(pll.con_offset, pll_con(112));
         assert_eq!(pll.mode_offset, RK3588_MODE_CON0);
         assert_eq!((pll.mode_shift, pll.lock_shift, pll.pll_flags), (2, 15, 0));
 
-        // NPLL: PLL_NPLL = 6
+        // NPLL: PLL_NPLL = 8
         let pll = get_pll(PllId::NPLL);
         assert_eq!(pll.con_offset, pll_con(120));
         assert_eq!(pll.mode_offset, RK3588_MODE_CON0);
@@ -703,5 +728,81 @@ mod tests {
         assert_eq!(pll.con_offset, pmu_pll_con(128));
         assert_eq!(pll.mode_offset, RK3588_MODE_CON0);
         assert_eq!((pll.mode_shift, pll.lock_shift, pll.pll_flags), (10, 15, 0));
+    }
+
+    #[test]
+    fn test_pll_id_to_clk_id_conversion() {
+        // 测试 PllId -> ClkId 转换
+        let clk_id: ClkId = PllId::GPLL.into();
+        assert_eq!(
+            clk_id.value(),
+            7,
+            "GPLL should convert to ClkId with value 7"
+        );
+
+        let clk_id: ClkId = PllId::CPLL.into();
+        assert_eq!(
+            clk_id.value(),
+            6,
+            "CPLL should convert to ClkId with value 6"
+        );
+
+        let clk_id: ClkId = PllId::PPLL.into();
+        assert_eq!(
+            clk_id.value(),
+            9,
+            "PPLL should convert to ClkId with value 9"
+        );
+    }
+
+    #[test]
+    fn test_clk_id_to_pll_id_conversion() {
+        // 测试 ClkId -> PllId 转换 (成功情况)
+        let clk_id = ClkId::new(7);
+        let pll_id = PllId::try_from(clk_id);
+        assert!(pll_id.is_ok(), "ClkId(7) should convert to PllId::GPLL");
+        assert_eq!(pll_id.unwrap(), PllId::GPLL);
+
+        let clk_id = ClkId::new(6);
+        let pll_id = PllId::try_from(clk_id);
+        assert!(pll_id.is_ok(), "ClkId(6) should convert to PllId::CPLL");
+        assert_eq!(pll_id.unwrap(), PllId::CPLL);
+
+        let clk_id = ClkId::new(9);
+        let pll_id = PllId::try_from(clk_id);
+        assert!(pll_id.is_ok(), "ClkId(9) should convert to PllId::PPLL");
+        assert_eq!(pll_id.unwrap(), PllId::PPLL);
+    }
+
+    #[test]
+    fn test_clk_id_to_pll_id_invalid() {
+        // 测试无效的 ClkId -> PllId 转换
+        let clk_id = ClkId::new(100); // 无效的 PLL ID
+        let result = PllId::try_from(clk_id);
+        assert!(
+            result.is_err(),
+            "Invalid ClkId should fail to convert to PllId"
+        );
+        assert_eq!(result.unwrap_err(), "Invalid PLL clock ID");
+    }
+
+    #[test]
+    fn test_pll_clk_id_round_trip() {
+        // 测试双向转换的一致性
+        let original_pll = PllId::NPLL;
+        let clk_id: ClkId = original_pll.into();
+        let converted_pll = PllId::try_from(clk_id).unwrap();
+        assert_eq!(
+            original_pll, converted_pll,
+            "Round-trip conversion should preserve PllId"
+        );
+
+        let original_pll = PllId::B0PLL;
+        let clk_id: ClkId = original_pll.into();
+        let converted_pll = PllId::try_from(clk_id).unwrap();
+        assert_eq!(
+            original_pll, converted_pll,
+            "Round-trip conversion should preserve PllId"
+        );
     }
 }

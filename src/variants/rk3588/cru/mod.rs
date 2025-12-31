@@ -1,5 +1,6 @@
 use crate::{Mmio, grf::GrfMmio};
 
+pub mod clock;
 mod consts;
 mod pll;
 
@@ -7,6 +8,7 @@ mod pll;
 // 公开导出
 // =============================================================================
 
+pub use clock::*;
 pub use consts::*;
 pub use pll::*;
 
@@ -467,6 +469,54 @@ impl Cru {
         Ok(actual_rate)
     }
 
+    /// 获取时钟频率
+    ///
+    /// # 参数
+    ///
+    /// * `id` - 时钟 ID
+    ///
+    /// # 返回
+    ///
+    /// 返回时钟频率 (Hz)，如果不支持该时钟则返回错误
+    pub fn clk_get_rate(&self, id: crate::clock::ClkId) -> Result<u64, &'static str> {
+        // 首先检查是否为 PLL 时钟
+        if is_pll_clk(id) {
+            let pll_id = PllId::try_from(id)?;
+            return Ok(self.pll_get_rate(pll_id));
+        }
+
+        // TODO: 实现其他类型的时钟频率获取
+        // - 根时钟
+        // - 外设时钟 (I2C, UART, SPI, PWM, etc.)
+        Err("Clock type not supported yet")
+    }
+
+    /// 设置时钟频率
+    ///
+    /// # 参数
+    ///
+    /// * `id` - 时钟 ID
+    /// * `rate_hz` - 目标频率 (Hz)
+    ///
+    /// # 返回
+    ///
+    /// 返回实际设置的频率 (Hz)，如果不支持该时钟则返回错误
+    pub fn clk_set_rate(
+        &mut self,
+        id: crate::clock::ClkId,
+        rate_hz: u64,
+    ) -> Result<u64, &'static str> {
+        // 首先检查是否为 PLL 时钟
+        if is_pll_clk(id) {
+            let pll_id = PllId::try_from(id)?;
+            return self.pll_set_rate(pll_id, rate_hz);
+        }
+
+        // TODO: 实现其他类型的时钟频率设置
+        // - 外设时钟 (I2C, UART, SPI, PWM, etc.)
+        Err("Clock type not supported yet")
+    }
+
     /// 写入 clksel_con 寄存器
     ///
     /// # 参数
@@ -734,18 +784,8 @@ mod tests {
     /// 测试 PLL 参数查找 (频率表)
     #[test]
     fn test_find_pll_params_from_table() {
-        // 创建一个虚拟 Cru 实例用于测试
-        // 注意: 这个测试不会真正访问硬件,只测试参数查找逻辑
-        let cru = Cru {
-            base: 0xfd7c0000,
-            grf: 0xfd58c000,
-            cpll_hz: 0,
-            gpll_hz: 0,
-            ppll_hz: 0,
-        };
-
         // 测试 GPLL 1188MHz (在频率表中)
-        let result = cru.find_pll_params(PllId::GPLL, GPLL_HZ as u64);
+        let result = find_pll_params(PllId::GPLL, GPLL_HZ as u64);
         assert!(result.is_ok(), "GPLL 1188MHz should be found in rate table");
         let (p, m, s, k) = result.unwrap();
         assert_eq!(
@@ -755,7 +795,7 @@ mod tests {
         );
 
         // 测试 CPLL 1500MHz (在频率表中)
-        let result = cru.find_pll_params(PllId::CPLL, CPLL_HZ as u64);
+        let result = find_pll_params(PllId::CPLL, CPLL_HZ as u64);
         assert!(result.is_ok(), "CPLL 1500MHz should be found in rate table");
         let (p, m, s, k) = result.unwrap();
         assert_eq!(
@@ -768,20 +808,12 @@ mod tests {
     /// 测试 PLL 参数查找 (超出范围)
     #[test]
     fn test_find_pll_params_out_of_range() {
-        let cru = Cru {
-            base: 0xfd7c0000,
-            grf: 0xfd58c000,
-            cpll_hz: 0,
-            gpll_hz: 0,
-            ppll_hz: 0,
-        };
-
         // 测试过低频率 (超出 VCO 范围)
-        let result = cru.find_pll_params(PllId::GPLL, 10 * MHZ as u64);
+        let result = find_pll_params(PllId::GPLL, 10 * MHZ as u64);
         assert!(result.is_err(), "10MHz should be out of VCO range");
 
         // 测试过高频率
-        let result = cru.find_pll_params(PllId::GPLL, 5000 * MHZ as u64);
+        let result = find_pll_params(PllId::GPLL, 5000 * MHZ as u64);
         assert!(result.is_err(), "5000MHz should be out of VCO range");
     }
 
@@ -802,5 +834,45 @@ mod tests {
         // NPLL: p=3, m=425, s=2, k=0 => 850MHz
         let rate = calc_pll_rate(fin, 3, 425, 2, 0);
         assert_eq!(rate, NPLL_HZ as u64, "NPLL calculation mismatch");
+    }
+
+    /// 测试 clk_get_rate (不支持的外设时钟)
+    #[test]
+    fn test_clk_get_rate_unsupported() {
+        let cru = Cru {
+            base: 0xfd7c0000,
+            grf: 0xfd58c000,
+            cpll_hz: 0,
+            gpll_hz: 0,
+            ppll_hz: 0,
+        };
+
+        // 测试获取 I2C 时钟 (当前未实现)
+        let rate = cru.clk_get_rate(CLK_I2C1);
+        assert!(
+            rate.is_err(),
+            "I2C clock should return error (not implemented)"
+        );
+        assert_eq!(rate.unwrap_err(), "Clock type not supported yet");
+    }
+
+    /// 测试 clk_set_rate (不支持的外设时钟)
+    #[test]
+    fn test_clk_set_rate_unsupported() {
+        let mut cru = Cru {
+            base: 0xfd7c0000,
+            grf: 0xfd58c000,
+            cpll_hz: 0,
+            gpll_hz: 0,
+            ppll_hz: 0,
+        };
+
+        // 测试设置 I2C 时钟 (当前未实现)
+        let result = cru.clk_set_rate(CLK_I2C1, 100_000_000);
+        assert!(
+            result.is_err(),
+            "I2C clock should return error (not implemented)"
+        );
+        assert_eq!(result.unwrap_err(), "Clock type not supported yet");
     }
 }
