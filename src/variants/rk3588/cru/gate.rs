@@ -197,6 +197,46 @@ pub mod adc {
 }
 
 // =============================================================================
+// USB 时钟门控
+// =============================================================================
+
+/// USB3 OTG2 时钟门控 (参考 Linux: clk-rk3588.c)
+pub mod usb3_otg2 {
+    use super::ClkGate;
+
+    clk_gate_group!(
+        ACLK_USB3OTG2 = (35, 7),
+        SUSPEND_CLK_USB3OTG2 = (35, 8),
+        REF_CLK_USB3OTG2 = (35, 9),
+    );
+}
+
+/// USB 根时钟门控
+pub mod usb_root {
+    use super::ClkGate;
+
+    clk_gate_group!(ACLK_USB_ROOT = (42, 0), HCLK_USB_ROOT = (42, 1),);
+}
+
+/// USB3 OTG0/1 和 HOST 时钟门控
+pub mod usb3_host {
+    use super::ClkGate;
+
+    clk_gate_group!(
+        ACLK_USB3OTG0 = (42, 4),
+        SUSPEND_CLK_USB3OTG0 = (42, 5),
+        REF_CLK_USB3OTG0 = (42, 6),
+        ACLK_USB3OTG1 = (42, 7),
+        SUSPEND_CLK_USB3OTG1 = (42, 8),
+        REF_CLK_USB3OTG1 = (42, 9),
+        HCLK_HOST0 = (42, 10),
+        HCLK_HOST_ARB0 = (42, 11),
+        HCLK_HOST1 = (42, 12),
+        HCLK_HOST_ARB1 = (42, 13),
+    );
+}
+
+// =============================================================================
 // 时钟门控映射表
 // =============================================================================
 
@@ -285,6 +325,27 @@ const CLK_GATE_TABLE: &[(ClkId, ClkGate)] = &[
     (CLK_SARADC, adc::CLK_SARADC),
     (PCLK_TSADC, adc::PCLK_TSADC),
     (CLK_TSADC, adc::CLK_TSADC),
+    // ========================================================================
+    // USB 时钟门控
+    // ========================================================================
+    // USB3 OTG2
+    (ACLK_USB3OTG2, usb3_otg2::ACLK_USB3OTG2),
+    (SUSPEND_CLK_USB3OTG2, usb3_otg2::SUSPEND_CLK_USB3OTG2),
+    (REF_CLK_USB3OTG2, usb3_otg2::REF_CLK_USB3OTG2),
+    // USB 根时钟
+    (ACLK_USB_ROOT, usb_root::ACLK_USB_ROOT),
+    (HCLK_USB_ROOT, usb_root::HCLK_USB_ROOT),
+    // USB3 OTG0/1 和 HOST
+    (ACLK_USB3OTG0, usb3_host::ACLK_USB3OTG0),
+    (SUSPEND_CLK_USB3OTG0, usb3_host::SUSPEND_CLK_USB3OTG0),
+    (REF_CLK_USB3OTG0, usb3_host::REF_CLK_USB3OTG0),
+    (ACLK_USB3OTG1, usb3_host::ACLK_USB3OTG1),
+    (SUSPEND_CLK_USB3OTG1, usb3_host::SUSPEND_CLK_USB3OTG1),
+    (REF_CLK_USB3OTG1, usb3_host::REF_CLK_USB3OTG1),
+    (HCLK_HOST0, usb3_host::HCLK_HOST0),
+    (HCLK_HOST_ARB0, usb3_host::HCLK_HOST_ARB0),
+    (HCLK_HOST1, usb3_host::HCLK_HOST1),
+    (HCLK_HOST_ARB1, usb3_host::HCLK_HOST_ARB1),
 ];
 
 impl Cru {
