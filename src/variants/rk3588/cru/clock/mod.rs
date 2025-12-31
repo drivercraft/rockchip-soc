@@ -284,6 +284,17 @@ pub fn is_adc_clk(clk_id: ClkId) -> bool {
         || (ClkId::PCLK_TSADC..=ClkId::CLK_TSADC).contains(&clk_id)
 }
 
+/// 判断时钟 ID 是否为 MMC/EMMC/SDIO/SFC
+pub fn is_mmc_clk(clk_id: ClkId) -> bool {
+    use crate::clock::ClkId;
+
+    // CCLK_EMMC, BCLK_EMMC, CCLK_SRC_SDIO, SCLK_SFC
+    matches!(
+        clk_id,
+        ClkId::CCLK_EMMC | ClkId::BCLK_EMMC | ClkId::CCLK_SRC_SDIO | ClkId::SCLK_SFC
+    )
+}
+
 /// 获取 I2C 编号 (0-8)
 ///
 /// # 返回

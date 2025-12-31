@@ -2,6 +2,8 @@
 //!
 //! 参考 u-boot: drivers/clk/rockchip/clk_rk3588.c
 
+use alloc::vec::Vec;
+
 use super::Cru;
 use super::error::{ClockError, ClockResult};
 use crate::{clock::ClkId, rk3588::cru::clock::*, rk3588::cru::consts::*};
@@ -254,7 +256,7 @@ impl Cru {
                     self.clrsetreg(
                         clksel_con(40),
                         (1 << 14) | (0xFF << 6),
-                        ((src_clk_div - 1) << 6),
+                        (src_clk_div - 1) << 6,
                     );
                     self.gpll_hz / (src_clk_div as u64)
                 }
@@ -270,7 +272,7 @@ impl Cru {
                     OSC_HZ / (src_clk_div as u64)
                 } else {
                     let src_clk_div = (self.gpll_hz / rate_hz).min(7) as u32;
-                    self.clrsetreg(clksel_con(41), (1 << 8) | 0xFF, (src_clk_div - 1));
+                    self.clrsetreg(clksel_con(41), (1 << 8) | 0xFF, src_clk_div - 1);
                     100 * MHZ / (src_clk_div as u64)
                 }
             }
@@ -384,34 +386,275 @@ impl Cru {
 
     /// 获取 MMC 时钟频率
     ///
-    /// 参考 u-boot: drivers/clk/rockchip/clk_rk3588.c:rk3588_mmc_get_clk()
+    /// 参考 Linux: drivers/clk/rockchip/clk-rk3588.c
     ///
-    /// 简化实现：返回固定 200MHz
+    /// 支持的时钟：
+    /// - CCLK_EMMC: EMMC card clock (CLKSEL_CON(77))
+    /// - BCLK_EMMC: EMMC bus clock (CLKSEL_CON(78))
+    /// - CCLK_SRC_SDIO: SDIO source clock (CLKSEL_CON(172))
+    /// - SCLK_SFC: SFC clock (CLKSEL_CON(78))
     ///
     /// # Errors
     ///
-    /// 此函数当前实现不会返回错误
-    pub(crate) fn mmc_get_rate(&self, _id: ClkId) -> ClockResult<u64> {
-        // MMC 时钟配置复杂，涉及多个分频器和时钟源
-        // 完整实现需要读取 CCLK_SRC_EMMC, CCLK_EMMC 等寄存器
-        Ok(200 * MHZ)
+    /// 如果时钟 ID 不支持，返回 `ClockError::UnsupportedClock`
+    pub(crate) fn mmc_get_rate(&self, id: ClkId) -> ClockResult<u64> {
+        use crate::clock::ClkId;
+
+        // 根据时钟 ID 确定寄存器和位域
+        let (con_reg, sel_shift, sel_mask, div_shift, div_mask, parent_sources): (
+            u32,
+            u32,
+            u32,
+            u32,
+            u32,
+            &[u64],
+        ) = match id {
+            ClkId::CCLK_EMMC => {
+                // CLksel_CON(77): sel[14:15], div[8:13]
+                static PARENTS: [u64; 3] = [0, 0, 24 * MHZ];
+                (
+                    77,
+                    crate::rk3588::cru::clk_sel77::CCLK_EMMC_SEL_SHIFT,
+                    crate::rk3588::cru::clk_sel77::CCLK_EMMC_SEL_MASK,
+                    crate::rk3588::cru::clk_sel77::CCLK_EMMC_DIV_SHIFT,
+                    crate::rk3588::cru::clk_sel77::CCLK_EMMC_DIV_MASK,
+                    &PARENTS, // 稍后填充实际值
+                )
+            }
+            ClkId::BCLK_EMMC => {
+                // CLKSEL_CON(78): sel[5], div[0:4]
+                static PARENTS: [u64; 2] = [0, 0];
+                (
+                    78,
+                    crate::rk3588::cru::clk_sel78::BCLK_EMMC_SEL_SHIFT,
+                    crate::rk3588::cru::clk_sel78::BCLK_EMMC_SEL_MASK,
+                    crate::rk3588::cru::clk_sel78::BCLK_EMMC_DIV_SHIFT,
+                    crate::rk3588::cru::clk_sel78::BCLK_EMMC_DIV_MASK,
+                    &PARENTS, // 稍后填充实际值
+                )
+            }
+            ClkId::CCLK_SRC_SDIO => {
+                // CLKSEL_CON(172): sel[8:9], div[2:7]
+                static PARENTS: [u64; 3] = [0, 0, 24 * MHZ];
+                (
+                    172,
+                    crate::rk3588::cru::clk_sel172::CCLK_SDIO_SRC_SEL_SHIFT,
+                    crate::rk3588::cru::clk_sel172::CCLK_SDIO_SRC_SEL_MASK,
+                    crate::rk3588::cru::clk_sel172::CCLK_SDIO_SRC_DIV_SHIFT,
+                    crate::rk3588::cru::clk_sel172::CCLK_SDIO_SRC_DIV_MASK,
+                    &PARENTS, // 稍后填充实际值
+                )
+            }
+            ClkId::SCLK_SFC => {
+                // CLKSEL_CON(78): sel[12:13], div[6:11]
+                static PARENTS: [u64; 3] = [0, 0, 24 * MHZ];
+                (
+                    78,
+                    crate::rk3588::cru::clk_sel78::SCLK_SFC_SEL_SHIFT,
+                    crate::rk3588::cru::clk_sel78::SCLK_SFC_SEL_MASK,
+                    crate::rk3588::cru::clk_sel78::SCLK_SFC_DIV_SHIFT,
+                    crate::rk3588::cru::clk_sel78::SCLK_SFC_DIV_MASK,
+                    &PARENTS, // 稍后填充实际值
+                )
+            }
+            _ => {
+                return Err(ClockError::unsupported(id));
+            }
+        };
+
+        // 动态填充父时钟频率
+        let parents: Vec<u64> = match id {
+            ClkId::CCLK_EMMC | ClkId::CCLK_SRC_SDIO | ClkId::SCLK_SFC => {
+                vec![self.gpll_hz, self.cpll_hz, 24 * MHZ]
+            }
+            ClkId::BCLK_EMMC => vec![self.gpll_hz, self.cpll_hz],
+            _ => return Err(ClockError::unsupported(id)),
+        };
+
+        // 读取寄存器
+        let val = self.read(clksel_con(con_reg));
+
+        // 提取时钟源选择和分频值
+        let sel = ((val & sel_mask) >> sel_shift) as usize;
+        let div = ((val & div_mask) >> div_shift) as u64;
+
+        // 获取父时钟频率
+        let parent_rate = parents
+            .get(sel)
+            .copied()
+            .ok_or_else(|| ClockError::rate_read_failed(id, "Invalid parent clock source"))?;
+
+        // 计算实际频率: rate = parent_rate / (div + 1)
+        let rate = parent_rate / (div + 1);
+
+        Ok(rate)
     }
 
     /// 设置 MMC 时钟频率
     ///
-    /// 参考 u-boot: drivers/clk/rockchip/clk_rk3588.c:rk3588_mmc_set_clk()
+    /// 参考 Linux: drivers/clk/rockchip/clk-rk3588.c
     ///
-    /// 简化实现：返回 200MHz
+    /// 支持的时钟：
+    /// - CCLK_EMMC: EMMC card clock (CLKSEL_CON(77))
+    /// - BCLK_EMMC: EMMC bus clock (CLKSEL_CON(78))
+    /// - CCLK_SRC_SDIO: SDIO source clock (CLKSEL_CON(172))
+    /// - SCLK_SFC: SFC clock (CLKSEL_CON(78))
+    ///
+    /// # 参数
+    ///
+    /// * `id` - 时钟 ID
+    /// * `rate_hz` - 目标频率 (Hz)
+    ///
+    /// # 返回
+    ///
+    /// 返回实际设置的频率
     ///
     /// # Errors
     ///
-    /// 此函数当前实现不会返回错误
-    pub(crate) fn mmc_set_rate(&mut self, _id: ClkId, _rate_hz: u64) -> ClockResult<u64> {
-        // MMC 时钟设置复杂，完整实现需要：
-        // 1. 选择时钟源 (GPLL/CPLL/200MHz/24MHz)
-        // 2. 配置分频器 (div, fracdiv)
-        // 3. 配置采样时钟
-        Ok(200 * MHZ)
+    /// 如果时钟 ID 不支持或无法设置目标频率，返回错误
+    pub(crate) fn mmc_set_rate(&mut self, id: ClkId, rate_hz: u64) -> ClockResult<u64> {
+        use crate::clock::ClkId;
+
+        // 根据时钟 ID 确定寄存器和位域，以及可用的时钟源
+        let (con_reg, sel_shift, sel_mask, div_shift, div_mask, parent_sources): (
+            u32,
+            u32,
+            u32,
+            u32,
+            u32,
+            &[(u64, u32)],
+        ) = match id {
+            ClkId::CCLK_EMMC => {
+                // CLKSEL_CON(77): sel[14:15], div[8:13]
+                static SOURCES: [(u64, u32); 3] = [
+                    (0, crate::rk3588::cru::clk_sel77::CCLK_EMMC_SEL_GPLL),
+                    (0, crate::rk3588::cru::clk_sel77::CCLK_EMMC_SEL_CPLL),
+                    (24 * MHZ, crate::rk3588::cru::clk_sel77::CCLK_EMMC_SEL_24M),
+                ];
+                (
+                    77,
+                    crate::rk3588::cru::clk_sel77::CCLK_EMMC_SEL_SHIFT,
+                    crate::rk3588::cru::clk_sel77::CCLK_EMMC_SEL_MASK,
+                    crate::rk3588::cru::clk_sel77::CCLK_EMMC_DIV_SHIFT,
+                    crate::rk3588::cru::clk_sel77::CCLK_EMMC_DIV_MASK,
+                    &SOURCES, // 稍后填充实际值
+                )
+            }
+            ClkId::BCLK_EMMC => {
+                // CLKSEL_CON(78): sel[5], div[0:4]
+                static SOURCES: [(u64, u32); 2] = [
+                    (0, crate::rk3588::cru::clk_sel78::BCLK_EMMC_SEL_GPLL),
+                    (0, crate::rk3588::cru::clk_sel78::BCLK_EMMC_SEL_CPLL),
+                ];
+                (
+                    78,
+                    crate::rk3588::cru::clk_sel78::BCLK_EMMC_SEL_SHIFT,
+                    crate::rk3588::cru::clk_sel78::BCLK_EMMC_SEL_MASK,
+                    crate::rk3588::cru::clk_sel78::BCLK_EMMC_DIV_SHIFT,
+                    crate::rk3588::cru::clk_sel78::BCLK_EMMC_DIV_MASK,
+                    &SOURCES, // 稍后填充实际值
+                )
+            }
+            ClkId::CCLK_SRC_SDIO => {
+                // CLKSEL_CON(172): sel[8:9], div[2:7]
+                static SOURCES: [(u64, u32); 3] = [
+                    (0, crate::rk3588::cru::clk_sel172::CCLK_SDIO_SRC_SEL_GPLL),
+                    (0, crate::rk3588::cru::clk_sel172::CCLK_SDIO_SRC_SEL_CPLL),
+                    (
+                        24 * MHZ,
+                        crate::rk3588::cru::clk_sel172::CCLK_SDIO_SRC_SEL_24M,
+                    ),
+                ];
+                (
+                    172,
+                    crate::rk3588::cru::clk_sel172::CCLK_SDIO_SRC_SEL_SHIFT,
+                    crate::rk3588::cru::clk_sel172::CCLK_SDIO_SRC_SEL_MASK,
+                    crate::rk3588::cru::clk_sel172::CCLK_SDIO_SRC_DIV_SHIFT,
+                    crate::rk3588::cru::clk_sel172::CCLK_SDIO_SRC_DIV_MASK,
+                    &SOURCES, // 稍后填充实际值
+                )
+            }
+            ClkId::SCLK_SFC => {
+                // CLKSEL_CON(78): sel[12:13], div[6:11]
+                static SOURCES: [(u64, u32); 3] = [
+                    (0, crate::rk3588::cru::clk_sel78::SCLK_SFC_SEL_GPLL),
+                    (0, crate::rk3588::cru::clk_sel78::SCLK_SFC_SEL_CPLL),
+                    (24 * MHZ, crate::rk3588::cru::clk_sel78::SCLK_SFC_SEL_24M),
+                ];
+                (
+                    78,
+                    crate::rk3588::cru::clk_sel78::SCLK_SFC_SEL_SHIFT,
+                    crate::rk3588::cru::clk_sel78::SCLK_SFC_SEL_MASK,
+                    crate::rk3588::cru::clk_sel78::SCLK_SFC_DIV_SHIFT,
+                    crate::rk3588::cru::clk_sel78::SCLK_SFC_DIV_MASK,
+                    &SOURCES, // 稍后填充实际值
+                )
+            }
+            _ => {
+                return Err(ClockError::unsupported(id));
+            }
+        };
+
+        // 动态构建时钟源列表（填充实际 PLL 频率）
+        let sources: Vec<(u64, u32)> = match id {
+            ClkId::CCLK_EMMC | ClkId::CCLK_SRC_SDIO | ClkId::SCLK_SFC => vec![
+                (self.gpll_hz, parent_sources[0].1),
+                (self.cpll_hz, parent_sources[1].1),
+                (24 * MHZ, parent_sources[2].1),
+            ],
+            ClkId::BCLK_EMMC => vec![
+                (self.gpll_hz, parent_sources[0].1),
+                (self.cpll_hz, parent_sources[1].1),
+            ],
+            _ => return Err(ClockError::unsupported(id)),
+        };
+
+        // 选择最佳时钟源和分频值
+        let mut best_parent_rate = 0u64;
+        let mut best_sel = 0u32;
+        let mut best_div = 0u64;
+        let mut min_error = u64::MAX;
+
+        // 遍历所有可能的时钟源，找到最接近目标频率的配置
+        for &(parent_rate, sel_val) in &sources {
+            // 计算最佳分频值: div = parent_rate / target_rate
+            let div = (parent_rate + rate_hz / 2) / rate_hz; // 四舍五入
+
+            // 限制分频范围
+            let max_div = (div_mask >> div_shift) + 1;
+            let div = div.clamp(1, max_div as u64);
+
+            // 计算实际频率
+            let actual_rate = parent_rate / div;
+
+            // 计算误差
+            let error = if actual_rate > rate_hz {
+                actual_rate - rate_hz
+            } else {
+                rate_hz - actual_rate
+            };
+
+            // 如果误差更小，则更新最佳配置
+            if error < min_error {
+                min_error = error;
+                best_parent_rate = parent_rate;
+                best_sel = sel_val;
+                best_div = div - 1; // 寄存器值 = div - 1
+            }
+        }
+
+        // 使用 Rockchip 写掩码机制配置寄存器
+        // 格式: (mask << 16) | value
+        // mask = sel_mask | div_mask
+        // value = (sel << sel_shift) | (div << div_shift)
+        let mask = sel_mask | div_mask;
+        let value = (best_sel << sel_shift) | ((best_div as u32) << div_shift);
+
+        self.clrsetreg(clksel_con(con_reg), mask, value);
+
+        // 返回实际频率
+        let actual_rate = best_parent_rate / (best_div + 1);
+        Ok(actual_rate)
     }
 
     // ========================================================================

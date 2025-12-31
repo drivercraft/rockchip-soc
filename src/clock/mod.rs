@@ -153,4 +153,10 @@ impl ClkId {
     pub const CLK_SARADC: ClkId = ClkId::new(157);
     pub const PCLK_TSADC: ClkId = ClkId::new(169); // TSADC: 169-170
     pub const CLK_TSADC: ClkId = ClkId::new(170);
+
+    // MMC/EMMC 时钟 (参考 Linux: clk-rk3588.c)
+    pub const CCLK_EMMC: ClkId = ClkId::new(314); // EMMC card clock
+    pub const BCLK_EMMC: ClkId = ClkId::new(315); // EMMC bus clock
+    pub const CCLK_SRC_SDIO: ClkId = ClkId::new(650); // SDIO source clock
+    pub const SCLK_SFC: ClkId = ClkId::new(317); // SFC clock
 }

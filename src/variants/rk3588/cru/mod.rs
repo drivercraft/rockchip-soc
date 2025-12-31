@@ -334,7 +334,12 @@ impl Cru {
             return self.adc_get_rate(id);
         }
 
-        // 7. 根时钟
+        // 7. MMC/EMMC/SDIO/SFC 时钟
+        if is_mmc_clk(id) {
+            return self.mmc_get_rate(id);
+        }
+
+        // 8. 根时钟
         if matches!(
             id,
             ACLK_BUS_ROOT
@@ -347,11 +352,6 @@ impl Cru {
                 | ACLK_CENTER_LOW_ROOT
         ) {
             return self.root_clk_get_rate(id);
-        }
-
-        // 8. 固定时钟
-        if matches!(id, CCLK_SRC_SDIO | CCLK_EMMC | BCLK_EMMC | SCLK_SFC) {
-            return self.mmc_get_rate(id);
         }
 
         Err(ClockError::rate_read_failed(
@@ -400,6 +400,11 @@ impl Cru {
         // 6. ADC 时钟
         if matches!(id, CLK_SARADC | CLK_TSADC) {
             return self.adc_set_rate(id, rate_hz);
+        }
+
+        // 7. MMC/EMMC/SDIO/SFC 时钟
+        if is_mmc_clk(id) {
+            return self.mmc_set_rate(id, rate_hz);
         }
 
         // 其他时钟类型暂不支持设置

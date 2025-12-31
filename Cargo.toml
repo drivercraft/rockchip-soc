@@ -11,6 +11,8 @@ thiserror = {version = "2", default-features = false}
 
 [target.'cfg(not(any(windows, unix)))'.dev-dependencies]
 bare-test = "0.7"
+sdmmc = { git = "https://github.com/YanQD/sdmmc.git" }
+spin = "0.10"
 
 [build-dependencies]
 bare-test-macros = "0.2"
