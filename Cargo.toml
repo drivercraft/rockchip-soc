@@ -4,9 +4,10 @@ name = "rockchip-soc"
 version = "0.1.0"
 
 [dependencies]
-mbarrier = "0.1"
-dma-api = { version = "0.5", features = ["alloc"] }
+dma-api = {version = "0.5", features = ["alloc"]}
 log = "0.4"
+mbarrier = "0.1"
+thiserror = {version = "2", default-features = false}
 
 [target.'cfg(not(any(windows, unix)))'.dev-dependencies]
 bare-test = "0.7"

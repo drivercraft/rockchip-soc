@@ -371,6 +371,10 @@ pub mod clk_sel59 {
     pub const CLK_SPI_SEL_200M: u32 = 0;
     pub const CLK_SPI_SEL_150M: u32 = 1;
     pub const CLK_SPI_SEL_24M: u32 = 2;
+
+    pub const CLK_PWM_SEL_100M: u32 = 0;
+    pub const CLK_PWM_SEL_50M: u32 = 1;
+    pub const CLK_PWM_SEL_24M: u32 = 2;
 }
 
 // CRU_CLK_SEL60_CON - PWM3 时钟
@@ -640,6 +644,10 @@ pub mod pmu_clk_sel2 {
     use super::*;
     pub const CLK_PMU1PWM_SEL_SHIFT: u32 = 9;
     pub const CLK_PMU1PWM_SEL_MASK: u32 = shift_mask(9, 2);
+
+    pub const CLK_PWM_SEL_100M: u32 = 0;
+    pub const CLK_PWM_SEL_50M: u32 = 1;
+    pub const CLK_PWM_SEL_24M: u32 = 2;
 }
 
 // PMUCRU_CLK_SEL3_CON - I2C0 时钟

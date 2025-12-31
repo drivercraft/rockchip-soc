@@ -2,6 +2,7 @@ use crate::{Mmio, grf::GrfMmio};
 
 pub mod clock;
 mod consts;
+mod peripheral;
 mod pll;
 
 // =============================================================================
@@ -479,15 +480,57 @@ impl Cru {
     ///
     /// 返回时钟频率 (Hz)，如果不支持该时钟则返回错误
     pub fn clk_get_rate(&self, id: crate::clock::ClkId) -> Result<u64, &'static str> {
-        // 首先检查是否为 PLL 时钟
+        // 1. PLL 时钟
         if is_pll_clk(id) {
             let pll_id = PllId::try_from(id)?;
             return Ok(self.pll_get_rate(pll_id));
         }
 
-        // TODO: 实现其他类型的时钟频率获取
-        // - 根时钟
-        // - 外设时钟 (I2C, UART, SPI, PWM, etc.)
+        // 2. I2C 时钟
+        if is_i2c_clk(id) {
+            return Ok(self.i2c_get_rate(id));
+        }
+
+        // 3. UART 时钟
+        if is_uart_clk(id) {
+            return Ok(self.uart_get_rate(id));
+        }
+
+        // 4. SPI 时钟
+        if is_spi_clk(id) {
+            return Ok(self.spi_get_rate(id));
+        }
+
+        // 5. PWM 时钟
+        if matches!(id, CLK_PWM1 | CLK_PWM2 | CLK_PWM3 | CLK_PMU1PWM) {
+            return Ok(self.pwm_get_rate(id));
+        }
+
+        // 6. ADC 时钟
+        if matches!(id, CLK_SARADC | CLK_TSADC) {
+            return Ok(self.adc_get_rate(id));
+        }
+
+        // 7. 根时钟
+        if matches!(
+            id,
+            ACLK_BUS_ROOT
+                | ACLK_TOP_ROOT
+                | PCLK_TOP_ROOT
+                | ACLK_LOW_TOP_ROOT
+                | ACLK_CENTER_ROOT
+                | PCLK_CENTER_ROOT
+                | HCLK_CENTER_ROOT
+                | ACLK_CENTER_LOW_ROOT
+        ) {
+            return Ok(self.root_clk_get_rate(id));
+        }
+
+        // 8. 固定时钟
+        if matches!(id, CCLK_SRC_SDIO | CCLK_EMMC | BCLK_EMMC | SCLK_SFC) {
+            return Ok(self.mmc_get_rate(id));
+        }
+
         Err("Clock type not supported yet")
     }
 
@@ -506,28 +549,39 @@ impl Cru {
         id: crate::clock::ClkId,
         rate_hz: u64,
     ) -> Result<u64, &'static str> {
-        // 首先检查是否为 PLL 时钟
+        // 1. PLL 时钟
         if is_pll_clk(id) {
             let pll_id = PllId::try_from(id)?;
             return self.pll_set_rate(pll_id, rate_hz);
         }
 
-        // TODO: 实现其他类型的时钟频率设置
-        // - 外设时钟 (I2C, UART, SPI, PWM, etc.)
-        Err("Clock type not supported yet")
-    }
+        // 2. I2C 时钟
+        if is_i2c_clk(id) {
+            return Ok(self.i2c_set_rate(id, rate_hz));
+        }
 
-    /// 写入 clksel_con 寄存器
-    ///
-    /// # 参数
-    ///
-    /// * `index` - 寄存器索引 (0-177)
-    /// * `mask` - 位掩码（要修改的位）
-    /// * `value` - 要写入的值（已移位到正确位置）
-    fn clksel_con_write(&mut self, index: u32, mask: u32, value: u32) {
-        let reg_offset = clksel_con(index);
-        // 使用 Rockchip 风格的 clrsetreg
-        self.clrsetreg(reg_offset, mask, value);
+        // 3. UART 时钟
+        if is_uart_clk(id) {
+            return Ok(self.uart_set_rate(id, rate_hz));
+        }
+
+        // 4. SPI 时钟
+        if is_spi_clk(id) {
+            return Ok(self.spi_set_rate(id, rate_hz));
+        }
+
+        // 5. PWM 时钟
+        if matches!(id, CLK_PWM1 | CLK_PWM2 | CLK_PWM3 | CLK_PMU1PWM) {
+            return Ok(self.pwm_set_rate(id, rate_hz));
+        }
+
+        // 6. ADC 时钟
+        if matches!(id, CLK_SARADC | CLK_TSADC) {
+            return Ok(self.adc_set_rate(id, rate_hz));
+        }
+
+        // 其他时钟类型暂不支持设置
+        Err("Clock type not supported for rate setting yet")
     }
 
     // ========================================================================
