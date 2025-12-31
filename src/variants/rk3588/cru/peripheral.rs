@@ -401,7 +401,7 @@ impl Cru {
         use crate::clock::ClkId;
 
         // 根据时钟 ID 确定寄存器和位域
-        let (con_reg, sel_shift, sel_mask, div_shift, div_mask, parent_sources): (
+        let (con_reg, sel_shift, sel_mask, div_shift, div_mask, _parent_sources): (
             u32,
             u32,
             u32,
@@ -628,11 +628,7 @@ impl Cru {
             let actual_rate = parent_rate / div;
 
             // 计算误差
-            let error = if actual_rate > rate_hz {
-                actual_rate - rate_hz
-            } else {
-                rate_hz - actual_rate
-            };
+            let error = actual_rate.abs_diff(rate_hz);
 
             // 如果误差更小，则更新最佳配置
             if error < min_error {
@@ -647,6 +643,237 @@ impl Cru {
         // 格式: (mask << 16) | value
         // mask = sel_mask | div_mask
         // value = (sel << sel_shift) | (div << div_shift)
+        let mask = sel_mask | div_mask;
+        let value = (best_sel << sel_shift) | ((best_div as u32) << div_shift);
+
+        self.clrsetreg(clksel_con(con_reg), mask, value);
+
+        // 返回实际频率
+        let actual_rate = best_parent_rate / (best_div + 1);
+        Ok(actual_rate)
+    }
+
+    // ========================================================================
+    // USB 时钟
+    // ========================================================================
+
+    /// 获取 USB 时钟频率
+    ///
+    /// 参考 Linux: drivers/clk/rockchip/clk-rk3588.c
+    ///
+    /// 支持的时钟：
+    /// - ACLK_USB_ROOT: USB ACLK root (CLKSEL_CON(96))
+    /// - HCLK_USB_ROOT: USB HCLK root (CLKSEL_CON(96))
+    /// - CLK_UTMI_OTG2: UTMI clock for OTG2 (CLKSEL_CON(84))
+    ///
+    /// # Errors
+    ///
+    /// 如果时钟 ID 不支持或寄存器读取失败，返回错误
+    pub(crate) fn usb_get_rate(&self, id: ClkId) -> ClockResult<u64> {
+        // 导入 USB clock ID 常量
+        use crate::rk3588::cru::clock::{ACLK_USB_ROOT, CLK_UTMI_OTG2, HCLK_USB_ROOT};
+
+        // USB 时钟源常量
+        const CLK_150M: u64 = 150 * MHZ;
+        const CLK_100M: u64 = 100 * MHZ;
+        const CLK_50M: u64 = 50 * MHZ;
+
+        // 根据时钟 ID 确定寄存器和位域
+        let (con_reg, sel_shift, sel_mask, div_shift, div_mask, parent_sources): (
+            u32,
+            u32,
+            u32,
+            u32,
+            u32,
+            &[u64],
+        ) = match id {
+            ACLK_USB_ROOT => {
+                // CLKSEL_CON(96): sel[5], div[0:4]
+                static PARENTS: [u64; 2] = [0, 0];
+                (
+                    96,
+                    crate::rk3588::cru::clk_sel96::ACLK_USB_ROOT_SEL_SHIFT,
+                    crate::rk3588::cru::clk_sel96::ACLK_USB_ROOT_SEL_MASK,
+                    crate::rk3588::cru::clk_sel96::ACLK_USB_ROOT_DIV_SHIFT,
+                    crate::rk3588::cru::clk_sel96::ACLK_USB_ROOT_DIV_MASK,
+                    &PARENTS,
+                )
+            }
+            HCLK_USB_ROOT => {
+                // CLKSEL_CON(96): sel[6:7], 无 div
+                static PARENTS: [u64; 4] = [CLK_150M, CLK_100M, CLK_50M, 24 * MHZ];
+                (
+                    96,
+                    crate::rk3588::cru::clk_sel96::HCLK_USB_ROOT_SEL_SHIFT,
+                    crate::rk3588::cru::clk_sel96::HCLK_USB_ROOT_SEL_MASK,
+                    0, // 无 div
+                    0, // 无 div
+                    &PARENTS,
+                )
+            }
+            CLK_UTMI_OTG2 => {
+                // CLKSEL_CON(84): sel[12:13], div[8:11]
+                static PARENTS: [u64; 3] = [CLK_150M, CLK_50M, 24 * MHZ];
+                (
+                    84,
+                    crate::rk3588::cru::clk_sel84::CLK_UTMI_OTG2_SEL_SHIFT,
+                    crate::rk3588::cru::clk_sel84::CLK_UTMI_OTG2_SEL_MASK,
+                    crate::rk3588::cru::clk_sel84::CLK_UTMI_OTG2_DIV_SHIFT,
+                    crate::rk3588::cru::clk_sel84::CLK_UTMI_OTG2_DIV_MASK,
+                    &PARENTS,
+                )
+            }
+            _ => {
+                return Err(ClockError::unsupported(id));
+            }
+        };
+
+        // 动态填充父时钟频率
+        let parents: Vec<u64> = match id {
+            ACLK_USB_ROOT => vec![self.gpll_hz, self.cpll_hz],
+            HCLK_USB_ROOT | CLK_UTMI_OTG2 => parent_sources.to_vec(),
+            _ => return Err(ClockError::unsupported(id)),
+        };
+
+        // 读取寄存器
+        let val = self.read(clksel_con(con_reg));
+
+        // 提取时钟源选择
+        let sel = ((val & sel_mask) >> sel_shift) as usize;
+
+        // 获取父时钟频率
+        let parent_rate = parents
+            .get(sel)
+            .copied()
+            .ok_or_else(|| ClockError::rate_read_failed(id, "Invalid parent clock source"))?;
+
+        // 对于无分频器的时钟 (HCLK_USB_ROOT)，直接返回父时钟频率
+        if id == HCLK_USB_ROOT {
+            return Ok(parent_rate);
+        }
+
+        // 提取分频值并计算实际频率
+        let div = ((val & div_mask) >> div_shift) as u64;
+        let rate = parent_rate / (div + 1);
+
+        Ok(rate)
+    }
+
+    /// 设置 USB 时钟频率
+    ///
+    /// 参考 Linux: drivers/clk/rockchip/clk-rk3588.c
+    ///
+    /// 支持的时钟：
+    /// - ACLK_USB_ROOT: USB ACLK root (CLKSEL_CON(96))
+    /// - CLK_UTMI_OTG2: UTMI clock for OTG2 (CLKSEL_CON(84))
+    ///
+    /// 注意: HCLK_USB_ROOT 是 COMPOSITE_NODIV 时钟，不支持 set_rate
+    ///
+    /// # Errors
+    ///
+    /// 如果时钟 ID 不支持或寄存器写入失败，返回错误
+    pub(crate) fn usb_set_rate(&mut self, id: ClkId, rate_hz: u64) -> ClockResult<u64> {
+        // 导入 USB clock ID 常量
+        use crate::rk3588::cru::clock::{ACLK_USB_ROOT, CLK_UTMI_OTG2, HCLK_USB_ROOT};
+
+        const CLK_150M: u64 = 150 * MHZ;
+        const CLK_50M: u64 = 50 * MHZ;
+
+        // HCLK_USB_ROOT 是 COMPOSITE_NODIV，不支持 set_rate
+        if id == HCLK_USB_ROOT {
+            return Err(ClockError::unsupported(id));
+        }
+
+        // 根据时钟 ID 确定寄存器和位域
+        let (con_reg, sel_shift, sel_mask, div_shift, div_mask, parent_sources): (
+            u32,
+            u32,
+            u32,
+            u32,
+            u32,
+            &[(u64, u32)],
+        ) = match id {
+            ACLK_USB_ROOT => {
+                static SOURCES: [(u64, u32); 2] = [
+                    (0, crate::rk3588::cru::clk_sel96::ACLK_USB_ROOT_SEL_GPLL),
+                    (0, crate::rk3588::cru::clk_sel96::ACLK_USB_ROOT_SEL_CPLL),
+                ];
+                (
+                    96,
+                    crate::rk3588::cru::clk_sel96::ACLK_USB_ROOT_SEL_SHIFT,
+                    crate::rk3588::cru::clk_sel96::ACLK_USB_ROOT_SEL_MASK,
+                    crate::rk3588::cru::clk_sel96::ACLK_USB_ROOT_DIV_SHIFT,
+                    crate::rk3588::cru::clk_sel96::ACLK_USB_ROOT_DIV_MASK,
+                    &SOURCES,
+                )
+            }
+            CLK_UTMI_OTG2 => {
+                static SOURCES: [(u64, u32); 3] = [
+                    (
+                        CLK_150M,
+                        crate::rk3588::cru::clk_sel84::CLK_UTMI_OTG2_SEL_150M,
+                    ),
+                    (
+                        CLK_50M,
+                        crate::rk3588::cru::clk_sel84::CLK_UTMI_OTG2_SEL_50M,
+                    ),
+                    (
+                        24 * MHZ,
+                        crate::rk3588::cru::clk_sel84::CLK_UTMI_OTG2_SEL_24M,
+                    ),
+                ];
+                (
+                    84,
+                    crate::rk3588::cru::clk_sel84::CLK_UTMI_OTG2_SEL_SHIFT,
+                    crate::rk3588::cru::clk_sel84::CLK_UTMI_OTG2_SEL_MASK,
+                    crate::rk3588::cru::clk_sel84::CLK_UTMI_OTG2_DIV_SHIFT,
+                    crate::rk3588::cru::clk_sel84::CLK_UTMI_OTG2_DIV_MASK,
+                    &SOURCES,
+                )
+            }
+            _ => {
+                return Err(ClockError::unsupported(id));
+            }
+        };
+
+        // 动态填充父时钟频率
+        let sources: Vec<(u64, u32)> = match id {
+            ACLK_USB_ROOT => vec![
+                (self.gpll_hz, parent_sources[0].1),
+                (self.cpll_hz, parent_sources[1].1),
+            ],
+            CLK_UTMI_OTG2 => parent_sources.to_vec(),
+            _ => return Err(ClockError::unsupported(id)),
+        };
+
+        // 查找最佳时钟源和分频值
+        let mut best_parent_rate = 0u64;
+        let mut best_sel = 0u32;
+        let mut best_div = 0u64;
+        let mut min_error = u64::MAX;
+
+        for &(parent_rate, sel_val) in &sources {
+            // 计算最佳分频值 (四舍五入)
+            let div = (parent_rate + rate_hz / 2) / rate_hz;
+
+            // 限制分频范围
+            let max_div = (div_mask >> div_shift) + 1;
+            let div = div.clamp(1, max_div as u64);
+
+            // 计算实际频率和误差
+            let actual_rate = parent_rate / div;
+            let error = actual_rate.abs_diff(rate_hz);
+
+            // 如果误差更小，则更新最佳配置
+            if error < min_error {
+                min_error = error;
+                best_parent_rate = parent_rate;
+                best_sel = sel_val;
+                best_div = div - 1; // 寄存器值 = div - 1
+            }
+        }
+
+        // 使用 Rockchip 写掩码机制配置寄存器
         let mask = sel_mask | div_mask;
         let value = (best_sel << sel_shift) | ((best_div as u32) << div_shift);
 

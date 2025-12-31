@@ -339,7 +339,12 @@ impl Cru {
             return self.mmc_get_rate(id);
         }
 
-        // 8. 根时钟
+        // 8. USB 时钟
+        if is_usb_clk(id) {
+            return self.usb_get_rate(id);
+        }
+
+        // 9. 根时钟
         if matches!(
             id,
             ACLK_BUS_ROOT
@@ -405,6 +410,11 @@ impl Cru {
         // 7. MMC/EMMC/SDIO/SFC 时钟
         if is_mmc_clk(id) {
             return self.mmc_set_rate(id, rate_hz);
+        }
+
+        // 8. USB 时钟
+        if is_usb_clk(id) {
+            return self.usb_set_rate(id, rate_hz);
         }
 
         // 其他时钟类型暂不支持设置
