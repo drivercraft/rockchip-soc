@@ -74,24 +74,6 @@ pub enum PllRateParams {
     },
 }
 
-impl PllRateTable {}
-
-/// PLL 标志位
-///
-/// 参考 PLL 相关的标志位定义
-pub mod pll_flags {
-    /// PLL 需要同步模式
-    pub const PLL_SYNC: u32 = 1 << 0;
-    /// PLL 使用小数分频
-    pub const PLL_FRAC: u32 = 1 << 1;
-    /// PLL 使用 4 个后分频器
-    pub const PLL_POSTDIV4: u32 = 1 << 2;
-    /// PLL 使用 RK3588 类型
-    pub const PLL_RK3588: u32 = 1 << 3;
-    /// PLL 使用 RK3399 类型
-    pub const PLL_RK3399: u32 = 1 << 4;
-}
-
 /// Rockchip PLL 时钟结构
 #[derive(Debug, Default)]
 #[repr(C)]
@@ -125,44 +107,6 @@ pub struct PllClock {
 }
 
 impl PllClock {
-    /// 创建新的 PLL 时钟实例
-    ///
-    /// # 参数
-    ///
-    /// * `id` - 时钟 ID
-    /// * `con_offset` - PLL 控制寄存器偏移
-    /// * `mode_offset` - 模式寄存器偏移
-    /// * `mode_shift` - 模式位偏移
-    /// * `lock_shift` - 锁定位偏移
-    /// * `pll_type` - PLL 类型
-    /// * `pll_flags` - PLL 标志位
-    /// * `rate_table` - 可选的速率表
-    /// * `mode_mask` - 模式掩码
-    #[must_use]
-    pub const fn new(
-        id: u32,
-        con_offset: u32,
-        mode_offset: u32,
-        mode_shift: u32,
-        lock_shift: u32,
-        pll_type: RockchipPllType,
-        pll_flags: u32,
-        rate_table: &'static [PllRateTable],
-        mode_mask: u32,
-    ) -> Self {
-        Self {
-            id,
-            con_offset,
-            mode_offset,
-            mode_shift,
-            lock_shift,
-            pll_type,
-            pll_flags,
-            rate_table,
-            mode_mask,
-        }
-    }
-
     /// 检查 PLL 是否已锁定
     ///
     /// # 参数

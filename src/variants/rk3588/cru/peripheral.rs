@@ -3,7 +3,7 @@
 //! 参考 u-boot: drivers/clk/rockchip/clk_rk3588.c
 
 use super::Cru;
-use crate::{clock::ClkId, rk3588::cru::consts::*, rk3588::cru::clock::*};
+use crate::{clock::ClkId, rk3588::cru::clock::*, rk3588::cru::consts::*};
 
 impl Cru {
     // ========================================================================
@@ -326,7 +326,7 @@ impl Cru {
         );
 
         // 配置 UART 时钟选择
-        self.clrsetreg(clksel_con(reg + 2), 0x3 << 0, uart_src << 0);
+        self.clrsetreg(clksel_con(reg + 2), 0x3, uart_src);
 
         match uart_src {
             0 => {
