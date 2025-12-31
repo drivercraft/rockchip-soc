@@ -14,23 +14,17 @@ pub use pll::*;
 // 内部常量定义
 // =============================================================================
 
-/// MHz 单位
-const MHZ: u64 = 1_000_000;
-
-/// clksel_con 寄存器基址偏移
-const CLKSEL_CON_OFFSET: usize = 0x0300;
-
 /// PLL 模式掩码
 const PLL_MODE_MASK: u32 = 0x3;
 
 /// PLLCON 寄存器偏移量
 const RK3588_PLLCON: fn(u32) -> u32 = |i: u32| i * 0x4;
 
-/// 计算 clksel_con 寄存器偏移
-#[must_use]
-const fn clksel_con(index: u32) -> usize {
-    CLKSEL_CON_OFFSET + (index as usize) * 4
-}
+// /// 计算 clksel_con 寄存器偏移
+// #[must_use]
+// const fn clksel_con(index: u32) -> usize {
+//     CLKSEL_CON_OFFSET + (index as usize) * 4
+// }
 
 /// ACLK_BUS_ROOT 选择和分频位定义 (clksel_con[38])
 const ACLK_BUS_ROOT_SEL_SHIFT: u32 = 5;
@@ -81,10 +75,9 @@ impl Cru {
     /// 6. ACLK_TOP_S200: 200MHz (clksel_con[9])
     pub fn init(&mut self) {
         log::info!(
-            "CRU@{:x}: Verifying clock configuration from u-boot",
+            "CRU@{:x}: Initializing and verifying clock configuration...",
             self.base
         );
-        log::info!("Comparing with u-boot drivers/clk/rockchip/clk_rk3588.c:rk3588_clk_init()");
 
         // ========================================================================
         // 1. 验证 ACLK_BUS_ROOT 配置
@@ -107,7 +100,7 @@ impl Cru {
         // 所以实际分频系数是 (div + 1)
         let bus_root_div_factor = bus_root_div + 1;
         let bus_root_rate = if bus_root_div > 0 {
-            GPLL_HZ as u64 / bus_root_div_factor as u64
+            GPLL_HZ / bus_root_div_factor as u64
         } else {
             0
         };
@@ -121,7 +114,7 @@ impl Cru {
         // u-boot 配置验证
         // u-boot: div = DIV_ROUND_UP(GPLL_HZ, 300 * MHz) - 1;
         //       = (1188 + 300 - 1) / 300 - 1 = 4 - 1 = 3
-        let expected_div = ((GPLL_HZ as u64) + (300 * MHZ) - 1) / (300 * MHZ) - 1;
+        let expected_div = GPLL_HZ.div_ceil(300 * MHZ) - 1;
         if bus_root_sel != ACLK_BUS_ROOT_SEL_GPLL {
             log::warn!(
                 "⚠ CRU@{:x}: ACLK_BUS_ROOT source mismatch! u-boot: GPLL(0), current: {}",
@@ -200,13 +193,10 @@ impl Cru {
         debug!("  - GPLL: {}MHz", gpll_actual / MHZ);
 
         // 验证与 u-boot 预期值的一致性
-        verify_pll_frequency(PllId::CPLL, cpll_actual, CPLL_HZ as u64);
-        verify_pll_frequency(PllId::GPLL, gpll_actual, GPLL_HZ as u64);
+        verify_pll_frequency(PllId::CPLL, cpll_actual, CPLL_HZ);
+        verify_pll_frequency(PllId::GPLL, gpll_actual, GPLL_HZ);
 
-        log::info!(
-            "✓ CRU@{:x}: Clock configuration verified vs u-boot",
-            self.base
-        );
+        log::info!("✓ CRU@{:x}: Clock configuration verified", self.base);
     }
 
     /// 读取 PLL 实际频率
@@ -225,7 +215,7 @@ impl Cru {
         let pll_cfg = get_pll(pll_id);
 
         // 1. 读取 PLL 模式
-        let mode_con = self.read(pll_cfg.mode_offset as usize);
+        let mode_con = self.read(pll_cfg.mode_offset);
         let mode_shift = pll_cfg.mode_shift;
 
         // PPLL (ID=8) 特殊处理: 始终认为是 NORMAL 模式
@@ -269,16 +259,16 @@ impl Cru {
 
         // 2. 读取 PLL 参数 (参考 u-boot rk3588_pll_get_rate)
         // PLLCON0: M (10 bits)
-        let con0 = self.read(pll_cfg.con_offset as usize);
+        let con0 = self.read(pll_cfg.con_offset);
         let m = (con0 & pllcon0::M_MASK) >> pllcon0::M_SHIFT;
 
         // PLLCON1: P (6 bits), S (3 bits)
-        let con1 = self.read((pll_cfg.con_offset + RK3588_PLLCON(1)) as usize);
+        let con1 = self.read(pll_cfg.con_offset + RK3588_PLLCON(1));
         let p = (con1 & pllcon1::P_MASK) >> pllcon1::P_SHIFT;
         let s = (con1 & pllcon1::S_MASK) >> pllcon1::S_SHIFT;
 
         // PLLCON2: K (16 bits)
-        let con2 = self.read((pll_cfg.con_offset + RK3588_PLLCON(2)) as usize);
+        let con2 = self.read(pll_cfg.con_offset + RK3588_PLLCON(2));
         let k = (con2 & pllcon2::K_MASK) >> pllcon2::K_SHIFT;
 
         debug!("{}: p={}, m={}, s={}, k={}", pll_id.name(), p, m, s, k);
@@ -318,15 +308,12 @@ impl Cru {
     /// * `index` - 寄存器索引 (0-177)
     /// * `mask` - 位掩码（要修改的位）
     /// * `value` - 要写入的值（已移位到正确位置）
-    fn clksel_con_write(&mut self, index: usize, mask: u32, value: u32) {
-        let reg_addr = self.base + CLKSEL_CON_OFFSET + index * 4;
+    fn clksel_con_write(&mut self, index: u32, mask: u32, value: u32) {
+        let reg_addr = self.base + clksel_con(index) as usize;
 
-        log::debug!(
+        debug!(
             "CRU@{:x}: Writing clksel_con[{}] = 0x{:08x} (mask=0x{:08x})",
-            self.base,
-            index,
-            value,
-            mask
+            self.base, index, value, mask
         );
 
         unsafe {
@@ -343,11 +330,9 @@ impl Cru {
 
             // 读取并验证
             let verify = reg.read_volatile();
-            log::debug!(
+            debug!(
                 "CRU@{:x}: clksel_con[{}] readback: 0x{:08x}",
-                self.base,
-                index,
-                verify
+                self.base, index, verify
             );
         }
     }
@@ -356,16 +341,16 @@ impl Cru {
         &[super::syscon::grf_mmio::SYS_GRF]
     }
 
-    fn reg(&self, offset: usize) -> *mut u32 {
-        (self.base + offset) as *mut u32
+    fn reg(&self, offset: u32) -> *mut u32 {
+        (self.base as u32 + offset) as *mut u32
     }
 
-    fn read(&self, offset: usize) -> u32 {
+    fn read(&self, offset: u32) -> u32 {
         unsafe { core::ptr::read_volatile(self.reg(offset)) }
     }
 
-    fn write(&self, offset: usize, value: u32) {
-        unsafe { core::ptr::write_volatile(self.reg(offset), value) }
+    fn write(&self, offset: u32, value: u32) {
+        unsafe { core::ptr::write_volatile(self.reg(offset as _), value) }
     }
 }
 

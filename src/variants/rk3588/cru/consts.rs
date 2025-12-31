@@ -8,16 +8,16 @@
 // 频率常量
 // ============================================================================
 
-pub const MHZ: u32 = 1_000_000;
+pub const MHZ: u64 = 1_000_000;
 pub const KHZ: u32 = 1_000;
-pub const OSC_HZ: u32 = 24 * MHZ;
+pub const OSC_HZ: u64 = 24 * MHZ;
 
-pub const CPU_PVTPLL_HZ: u32 = 1008 * MHZ;
-pub const LPLL_HZ: u32 = 816 * MHZ;
-pub const GPLL_HZ: u32 = 1188 * MHZ;
-pub const CPLL_HZ: u32 = 1500 * MHZ;
-pub const NPLL_HZ: u32 = 850 * MHZ;
-pub const PPLL_HZ: u32 = 1100 * MHZ;
+pub const CPU_PVTPLL_HZ: u64 = 1008 * MHZ;
+pub const LPLL_HZ: u64 = 816 * MHZ;
+pub const GPLL_HZ: u64 = 1188 * MHZ;
+pub const CPLL_HZ: u64 = 1500 * MHZ;
+pub const NPLL_HZ: u64 = 850 * MHZ;
+pub const PPLL_HZ: u64 = 1100 * MHZ;
 
 // ============================================================================
 // CRU 基地址偏移
@@ -41,9 +41,12 @@ pub const fn pll_con(x: u32) -> u32 {
 /// 模式控制寄存器偏移
 pub const RK3588_MODE_CON0: u32 = 0x280;
 
+/// clksel_con 寄存器基址偏移
+pub const CLKSEL_CON_OFFSET: u32 = 0x0300;
+
 /// 时钟选择寄存器偏移
 pub const fn clksel_con(x: u32) -> u32 {
-    x * 0x4 + 0x300
+    x * 0x4 + CLKSEL_CON_OFFSET
 }
 
 /// 时钟门控寄存器偏移
@@ -665,18 +668,18 @@ pub mod pll_mode {
 pub mod pllcon0 {
     /// M 分频系数 (反馈分频)
     pub const M_SHIFT: u32 = 0;
-    pub const M_MASK: u32 = 0x3ff << M_SHIFT;  // 10 bits
+    pub const M_MASK: u32 = 0x3ff << M_SHIFT; // 10 bits
 }
 
 /// RK3588 PLL 配置寄存器 1 (PLLCON1)
 pub mod pllcon1 {
     /// P 分频系数 (预分频)
     pub const P_SHIFT: u32 = 0;
-    pub const P_MASK: u32 = 0x3f << P_SHIFT;  // 6 bits
+    pub const P_MASK: u32 = 0x3f << P_SHIFT; // 6 bits
 
     /// S 分频系数 (后分频)
     pub const S_SHIFT: u32 = 6;
-    pub const S_MASK: u32 = 0x7 << S_SHIFT;  // 3 bits
+    pub const S_MASK: u32 = 0x7 << S_SHIFT; // 3 bits
 
     /// PLL 掉电使能
     pub const PWRDOWN: u32 = 1 << 13;
@@ -686,7 +689,7 @@ pub mod pllcon1 {
 pub mod pllcon2 {
     /// K 小数分频系数
     pub const K_SHIFT: u32 = 0;
-    pub const K_MASK: u32 = 0xffff << K_SHIFT;  // 16 bits
+    pub const K_MASK: u32 = 0xffff << K_SHIFT; // 16 bits
 }
 
 /// RK3588 PLL 配置寄存器 6 (PLLCON6)
