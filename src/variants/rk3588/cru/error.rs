@@ -19,12 +19,10 @@ pub enum ClockError {
     /// 不支持的时钟 ID
     ///
     /// 当尝试操作一个不存在或未实现的时钟时返回
-    #[error("unsupported clock ID: {clk_id} (value: {value})")]
+    #[error("unsupported: {clk_id}")]
     UnsupportedClock {
         /// 时钟 ID
         clk_id: ClkId,
-        /// 时钟 ID 的数值
-        value: u32,
     },
 
     /// 时钟频率设置失败
@@ -113,10 +111,7 @@ impl ClockError {
     /// 创建不支持时钟错误
     #[must_use]
     pub const fn unsupported(clk_id: ClkId) -> Self {
-        Self::UnsupportedClock {
-            clk_id,
-            value: clk_id.value() as u32,
-        }
+        Self::UnsupportedClock { clk_id }
     }
 
     /// 创建无效频率错误
@@ -218,7 +213,7 @@ mod tests {
 
         let err = ClockError::unsupported(CLK_SPI0);
         match err {
-            ClockError::UnsupportedClock { clk_id, value } => {
+            ClockError::UnsupportedClock { clk_id } => {
                 assert_eq!(clk_id, CLK_SPI0);
                 assert_eq!(value, 165);
             }
