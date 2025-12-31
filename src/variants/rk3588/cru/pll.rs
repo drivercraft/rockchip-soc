@@ -228,6 +228,76 @@ pub const fn calc_pll_rate(fin: u64, p: u32, m: u32, s: u32, k: u32) -> u64 {
     }
 }
 
+/// 查找或计算 PLL 参数
+///
+/// # 参数
+///
+/// * `pll_id` - PLL ID
+/// * `rate_hz` - 目标频率 (Hz)
+///
+/// # 返回
+///
+/// (p, m, s, k) 参数元组
+pub fn find_pll_params(pll_id: PllId, rate_hz: u64) -> Result<(u32, u32, u32, u32), &'static str> {
+    let pll_cfg = get_pll(pll_id);
+
+    // 1. 首先尝试从预设频率表中查找
+    for entry in pll_cfg.rate_table {
+        if entry.rate == rate_hz
+            && let PllRateParams::Rk3588 { p, m, s, k } = entry.params
+        {
+            debug!(
+                "{}: found preset rate table entry for {}MHz",
+                pll_id.name(),
+                rate_hz / MHZ
+            );
+            return Ok((p, m, s, k));
+        }
+    }
+
+    // 2. 如果预设表没有,尝试简单计算 (仅支持整数分频)
+    // 公式: fout = ((fin / p) * m) >> s
+    // 简化: 设 p=2, s=1, 则 fout = (fin / 2 * m) >> 1 = fin * m / 4
+    // 因此: m = fout * 4 / fin
+
+    let fin = OSC_HZ;
+    let target_vco = rate_hz * 4; // 假设 s=2 (后分频4)
+
+    // 检查 VCO 频率范围
+    const VCO_MIN_HZ: u64 = 2250 * MHZ;
+    const VCO_MAX_HZ: u64 = 4500 * MHZ;
+
+    if !(VCO_MIN_HZ..=VCO_MAX_HZ).contains(&target_vco) {
+        return Err("Target frequency out of VCO range");
+    }
+
+    // 计算参数: p=2, s=2 (后分频4)
+    let p = 2u32;
+    let s = 2u32;
+    let m = ((rate_hz << s) / (fin / p as u64)) as u32;
+    let k = 0u32; // 暂不支持小数分频计算
+
+    // 验证计算结果
+    let check_rate = calc_pll_rate(fin, p, m, s, k);
+    let tolerance = rate_hz / 1000; // 0.1% 容差
+
+    if check_rate.abs_diff(rate_hz) > tolerance {
+        return Err("Cannot calculate accurate PLL parameters");
+    }
+
+    log::warn!(
+        "⚠️ {}: No preset rate table entry for {}MHz, calculated: p={}, m={}, s={}, k={}",
+        pll_id.name(),
+        rate_hz / MHZ,
+        p,
+        m,
+        s,
+        k
+    );
+
+    Ok((p, m, s, k))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
