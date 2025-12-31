@@ -467,6 +467,18 @@ pub mod clk_sel83 {
 // CRU_CLK_SEL84_CON - GMAC 50M 时钟
 pub mod clk_sel84 {
     use super::*;
+
+    // CLK_UTMI_OTG2 (bits 12:15)
+    pub const CLK_UTMI_OTG2_SEL_SHIFT: u32 = 12;
+    pub const CLK_UTMI_OTG2_SEL_MASK: u32 = shift_mask(12, 2);
+    pub const CLK_UTMI_OTG2_SEL_150M: u32 = 0;
+    pub const CLK_UTMI_OTG2_SEL_50M: u32 = 1;
+    pub const CLK_UTMI_OTG2_SEL_24M: u32 = 2;
+
+    pub const CLK_UTMI_OTG2_DIV_SHIFT: u32 = 8;
+    pub const CLK_UTMI_OTG2_DIV_MASK: u32 = shift_mask(8, 4);
+
+    // CLK_GMAC_50M (bits 0:7)
     pub const CLK_GMAC_50M_SEL_SHIFT: u32 = 7;
     pub const CLK_GMAC_50M_SEL_MASK: u32 = 1 << 7;
     pub const CLK_GMAC_50M_SEL_GPLL: u32 = 0;
@@ -474,6 +486,28 @@ pub mod clk_sel84 {
 
     pub const CLK_GMAC_50M_DIV_SHIFT: u32 = 0;
     pub const CLK_GMAC_50M_DIV_MASK: u32 = shift_mask(0, 7);
+}
+
+// CRU_CLK_SEL96_CON - USB 根时钟
+pub mod clk_sel96 {
+    use super::*;
+
+    // ACLK_USB_ROOT (bits 0:5)
+    pub const ACLK_USB_ROOT_SEL_SHIFT: u32 = 5;
+    pub const ACLK_USB_ROOT_SEL_MASK: u32 = 1 << 5;
+    pub const ACLK_USB_ROOT_SEL_GPLL: u32 = 0;
+    pub const ACLK_USB_ROOT_SEL_CPLL: u32 = 1;
+
+    pub const ACLK_USB_ROOT_DIV_SHIFT: u32 = 0;
+    pub const ACLK_USB_ROOT_DIV_MASK: u32 = shift_mask(0, 5);
+
+    // HCLK_USB_ROOT (bits 6:7, COMPOSITE_NODIV - 只有 sel 无 div)
+    pub const HCLK_USB_ROOT_SEL_SHIFT: u32 = 6;
+    pub const HCLK_USB_ROOT_SEL_MASK: u32 = shift_mask(6, 2);
+    pub const HCLK_USB_ROOT_SEL_150M: u32 = 0;
+    pub const HCLK_USB_ROOT_SEL_100M: u32 = 1;
+    pub const HCLK_USB_ROOT_SEL_50M: u32 = 2;
+    pub const HCLK_USB_ROOT_SEL_24M: u32 = 3;
 }
 
 // CRU_CLK_SEL110_CON - VOP 显示时钟

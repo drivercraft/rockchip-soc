@@ -233,6 +233,34 @@ clk_id_group!(
 );
 
 // =============================================================================
+// USB 时钟 ID
+// =============================================================================
+
+clk_id_group!(
+    ACLK_USB3OTG2 = 375,
+    SUSPEND_CLK_USB3OTG2 = 376,
+    REF_CLK_USB3OTG2 = 377,
+    CLK_UTMI_OTG2 = 378,
+);
+
+clk_id_group!(
+    ACLK_USB_ROOT = 411,
+    HCLK_USB_ROOT = 412,
+    HCLK_HOST0 = 413,
+    HCLK_HOST_ARB0 = 414,
+    HCLK_HOST1 = 415,
+    HCLK_HOST_ARB1 = 416,
+    ACLK_USB3OTG0 = 417,
+    SUSPEND_CLK_USB3OTG0 = 418,
+    REF_CLK_USB3OTG0 = 419,
+    ACLK_USB3OTG1 = 420,
+    SUSPEND_CLK_USB3OTG1 = 421,
+    REF_CLK_USB3OTG1 = 422,
+    UTMI_OHCI_CLK48_HOST0 = 423,
+    UTMI_OHCI_CLK48_HOST1 = 424,
+);
+
+// =============================================================================
 // 辅助函数：时钟类型判断和外设编号提取
 // =============================================================================
 
@@ -293,6 +321,36 @@ pub fn is_mmc_clk(clk_id: ClkId) -> bool {
         clk_id,
         ClkId::CCLK_EMMC | ClkId::BCLK_EMMC | ClkId::CCLK_SRC_SDIO | ClkId::SCLK_SFC
     )
+}
+
+/// 判断时钟 ID 是否为 USB
+///
+/// USB 时钟包括：
+/// - 可配置频率时钟：ACLK_USB_ROOT, HCLK_USB_ROOT, CLK_UTMI_OTG2
+/// - 固定频率门控时钟：其他所有 USB 时钟
+pub fn is_usb_clk(clk_id: ClkId) -> bool {
+    // 可配置频率时钟
+    let configurable = matches!(clk_id, ACLK_USB_ROOT | HCLK_USB_ROOT | CLK_UTMI_OTG2);
+
+    // 固定频率门控时钟
+    let gates = matches!(
+        clk_id,
+        ACLK_USB3OTG2
+            | SUSPEND_CLK_USB3OTG2
+            | REF_CLK_USB3OTG2
+            | ACLK_USB3OTG0
+            | SUSPEND_CLK_USB3OTG0
+            | REF_CLK_USB3OTG0
+            | ACLK_USB3OTG1
+            | SUSPEND_CLK_USB3OTG1
+            | REF_CLK_USB3OTG1
+            | HCLK_HOST0
+            | HCLK_HOST_ARB0
+            | HCLK_HOST1
+            | HCLK_HOST_ARB1
+    );
+
+    configurable || gates
 }
 
 /// 获取 I2C 编号 (0-8)
