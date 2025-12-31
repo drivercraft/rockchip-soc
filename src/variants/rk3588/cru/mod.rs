@@ -383,20 +383,20 @@ impl Cru {
 
         // 写入 M (10 bits)
         let con0 = self.read(pll_cfg.con_offset);
-        let new_con0 = (con0 & !pllcon0::M_MASK) | ((m as u32) << pllcon0::M_SHIFT);
+        let new_con0 = (con0 & !pllcon0::M_MASK) | (m << pllcon0::M_SHIFT);
         self.write(pll_cfg.con_offset, new_con0);
 
         // 写入 P (6 bits) 和 S (3 bits)
         let con1_val = self.read(pll_cfg.con_offset + pll_con(1));
         let new_con1 = (con1_val & !(pllcon1::P_MASK | pllcon1::S_MASK))
-            | ((p as u32) << pllcon1::P_SHIFT)
-            | ((s as u32) << pllcon1::S_SHIFT);
+            | (p << pllcon1::P_SHIFT)
+            | (s << pllcon1::S_SHIFT);
         self.write(pll_cfg.con_offset + pll_con(1), new_con1);
 
         // 写入 K (16 bits, 如果有小数分频)
         if k != 0 {
             let con2 = self.read(pll_cfg.con_offset + pll_con(2));
-            let new_con2 = (con2 & !pllcon2::K_MASK) | ((k as u32) << pllcon2::K_SHIFT);
+            let new_con2 = (con2 & !pllcon2::K_MASK) | (k << pllcon2::K_SHIFT);
             self.write(pll_cfg.con_offset + pll_con(2), new_con2);
         }
 
@@ -510,7 +510,7 @@ impl Cru {
         const VCO_MIN_HZ: u64 = 2250 * MHZ;
         const VCO_MAX_HZ: u64 = 4500 * MHZ;
 
-        if target_vco < VCO_MIN_HZ || target_vco > VCO_MAX_HZ {
+        if !(VCO_MIN_HZ..=VCO_MAX_HZ).contains(&target_vco) {
             return Err("Target frequency out of VCO range");
         }
 
