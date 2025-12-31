@@ -27,6 +27,12 @@ impl From<ClkId> for u64 {
     }
 }
 
+impl core::fmt::Display for ClkId {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "ClkId({})", self.0)
+    }
+}
+
 impl ClkId {
     /// 获取时钟 ID 的数值表示
     pub const fn value(&self) -> u64 {
