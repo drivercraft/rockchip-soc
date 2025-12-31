@@ -220,8 +220,8 @@ impl Cru {
     /// ```rust,ignore
     /// cru.clk_enable(CLK_I2C1)?;
     /// ```
-    pub fn clk_enable(&mut self, id: ClkId) -> Result<(), &'static str> {
-        let gate = self.find_clk_gate(id).ok_or("Clock gate not found")?;
+    pub fn clk_enable(&mut self, id: ClkId) -> ClockResult<()> {
+        let gate = self.find_clk_gate(id).ok_or(ClockError::unsupported(id))?;
         let offset = self.get_gate_reg_offset(gate);
 
         // Rockchip 写掩码机制：清除 bit
@@ -254,8 +254,8 @@ impl Cru {
     /// ```rust,ignore
     /// cru.clk_disable(CLK_I2C1)?;
     /// ```
-    pub fn clk_disable(&mut self, id: ClkId) -> Result<(), &'static str> {
-        let gate = self.find_clk_gate(id).ok_or("Clock gate not found")?;
+    pub fn clk_disable(&mut self, id: ClkId) -> ClockResult<()> {
+        let gate = self.find_clk_gate(id).ok_or(ClockError::unsupported(id))?;
         let offset = self.get_gate_reg_offset(gate);
 
         // Rockchip 写掩码机制：设置 bit
