@@ -1,4 +1,4 @@
-#![no_std]
+#![cfg_attr(not(any(windows, unix)), no_std)]
 
 extern crate alloc;
 

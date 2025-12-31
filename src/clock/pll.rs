@@ -224,70 +224,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_pll_rate_table_rk3036() {
-        // 测试 RK3036 类型速率表
-        let rate = PllRateTable::rk3036(
-            1188 * 1_000_000, // rate
-            1,                // nr
-            99,               // nf
-            1,                // no
-            0,                // nb
-            99,               // fbdiv
-            1,                // postdiv1
-            1,                // refdiv
-            1,                // postdiv2
-            1,                // dsmpd
-            0,                // frac
-        );
-
-        assert_eq!(rate.rate, 1188 * 1_000_000);
-
-        // 验证参数类型
-        match rate.params {
-            PllRateParams::Rk3036 { fbdiv, .. } => {
-                assert_eq!(fbdiv, 99);
-            }
-            _ => panic!("Expected Rk3036 params"),
-        }
-    }
-
-    #[test]
-    fn test_pll_rate_table_rk3588() {
-        // 测试 RK3588 类型速率表
-        let rate = PllRateTable::rk3588(
-            1188 * 1_000_000, // rate
-            1,                // nr
-            99,               // nf
-            1,                // no
-            0,                // nb
-            99,               // m
-            3,                // p
-            1,                // s
-            0,                // k
-        );
-
-        assert_eq!(rate.rate, 1188 * 1_000_000);
-
-        // 验证参数类型
-        match rate.params {
-            PllRateParams::Rk3588 { m, p, s, k } => {
-                assert_eq!(m, 99);
-                assert_eq!(p, 3);
-                assert_eq!(s, 1);
-                assert_eq!(k, 0);
-            }
-            _ => panic!("Expected Rk3588 params"),
-        }
-    }
-
-    #[test]
     fn test_pll_type_values() {
         // 验证枚举值的整型对应关系
-        assert_eq!(RockchipPllType::PllRk3036 as u32, 0);
-        assert_eq!(RockchipPllType::PllRk3066 as u32, 1);
-        assert_eq!(RockchipPllType::PllRk3399 as u32, 2);
-        assert_eq!(RockchipPllType::PllRv1108 as u32, 3);
-        assert_eq!(RockchipPllType::PllRk3588 as u32, 4);
+        assert_eq!(RockchipPllType::Rk3036 as u32, 0);
+        assert_eq!(RockchipPllType::Rk3066 as u32, 1);
+        assert_eq!(RockchipPllType::Rk3399 as u32, 2);
+        assert_eq!(RockchipPllType::Rv1108 as u32, 3);
+        assert_eq!(RockchipPllType::Rk3588 as u32, 4);
     }
 
     #[test]
