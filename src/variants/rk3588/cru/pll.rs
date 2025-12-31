@@ -57,12 +57,12 @@ impl PllId {
     #[must_use]
     pub const fn default_rate(&self) -> Option<u64> {
         match self {
-            Self::B0PLL | Self::B1PLL => Some(LPLL_HZ as u64),
-            Self::LPLL => Some(LPLL_HZ as u64),
-            Self::GPLL => Some(GPLL_HZ as u64),
-            Self::CPLL => Some(CPLL_HZ as u64),
-            Self::NPLL => Some(NPLL_HZ as u64),
-            Self::PPLL => Some(PPLL_HZ as u64),
+            Self::B0PLL | Self::B1PLL => Some(LPLL_HZ),
+            Self::LPLL => Some(LPLL_HZ),
+            Self::GPLL => Some(GPLL_HZ),
+            Self::CPLL => Some(CPLL_HZ),
+            Self::NPLL => Some(NPLL_HZ),
+            Self::PPLL => Some(PPLL_HZ),
             _ => None,
         }
     }

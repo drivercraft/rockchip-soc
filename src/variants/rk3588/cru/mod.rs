@@ -233,7 +233,7 @@ impl Cru {
                     pll_id.name(),
                     mode_shift
                 );
-                return OSC_HZ as u64;
+                return OSC_HZ;
             }
             pll_mode::PLL_MODE_DEEP => {
                 debug!(
@@ -253,7 +253,7 @@ impl Cru {
                     mode_shift,
                     mode
                 );
-                return OSC_HZ as u64;
+                return OSC_HZ;
             }
         }
 
@@ -279,17 +279,17 @@ impl Cru {
                 "⚠️ PLL[mode_shift={}] has invalid p=0, assuming not configured, returning OSC_HZ",
                 mode_shift
             );
-            return OSC_HZ as u64;
+            return OSC_HZ;
         }
 
         // 4. 计算频率 (参考 u-boot rk3588_pll_get_rate)
         // rate = OSC_HZ / p * m
-        let mut rate: u64 = (OSC_HZ as u64 / p as u64) * m as u64;
+        let mut rate: u64 = (OSC_HZ / p as u64) * m as u64;
 
         // 如果有小数分频 k
         if k != 0 {
             // frac_rate = OSC_HZ * k / (p * 65536)
-            let frac_rate = (OSC_HZ as u64 * k as u64) / (p as u64 * 65536);
+            let frac_rate = (OSC_HZ * k as u64) / (p as u64 * 65536);
             rate += frac_rate;
         }
 
@@ -364,11 +364,7 @@ impl Cru {
 /// * `actual_hz` - 实际读取的频率 (Hz)
 /// * `expected_hz` - 预期频率 (Hz)
 fn verify_pll_frequency(pll_id: PllId, actual_hz: u64, expected_hz: u64) {
-    let diff_hz = if actual_hz > expected_hz {
-        actual_hz - expected_hz
-    } else {
-        expected_hz - actual_hz
-    };
+    let diff_hz = actual_hz.abs_diff(expected_hz);
 
     // 允许 0.1% 的误差
     let tolerance = expected_hz / 1000;
