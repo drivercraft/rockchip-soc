@@ -295,10 +295,15 @@ impl Cru {
     /// 如果时钟 ID 不支持，返回 `ClockError::UnsupportedClock`
     pub(crate) fn uart_get_rate(&self, id: ClkId) -> ClockResult<u64> {
         let reg = match id {
-            SCLK_UART0 => 41,
-            SCLK_UART1 => 43,
-            SCLK_UART2 => 45,
-            SCLK_UART3 => 47,
+            SCLK_UART1 => 41,
+            SCLK_UART2 => 43,
+            SCLK_UART3 => 45,
+            SCLK_UART4 => 47,
+            SCLK_UART5 => 49,
+            SCLK_UART6 => 51,
+            SCLK_UART7 => 53,
+            SCLK_UART8 => 55,
+            SCLK_UART9 => 57,
             _ => return Err(ClockError::unsupported(id)),
         };
 
@@ -339,10 +344,15 @@ impl Cru {
     /// 如果时钟 ID 不支持，返回 `ClockError::UnsupportedClock`
     pub(crate) fn uart_set_rate(&mut self, id: ClkId, rate_hz: u64) -> ClockResult<u64> {
         let reg = match id {
-            SCLK_UART0 => 41,
-            SCLK_UART1 => 43,
-            SCLK_UART2 => 45,
-            SCLK_UART3 => 47,
+            SCLK_UART1 => 41,
+            SCLK_UART2 => 43,
+            SCLK_UART3 => 45,
+            SCLK_UART4 => 47,
+            SCLK_UART5 => 49,
+            SCLK_UART6 => 51,
+            SCLK_UART7 => 53,
+            SCLK_UART8 => 55,
+            SCLK_UART9 => 57,
             _ => return Err(ClockError::unsupported(id)),
         };
 
