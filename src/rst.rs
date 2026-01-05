@@ -84,7 +84,7 @@ impl ResetRockchip {
         let bank = id.value() / 16;
         let offset = id.value() % 16;
         let addr = self.base + (bank as usize * 4);
-        debug!("deassert reset (id={id}) (reg_addr={addr:#x})\n",);
+        debug!("deassert reset (id={id}) (reg_addr={addr:#x})",);
 
         unsafe {
             let reg = addr as *mut u32;
