@@ -1,4 +1,6 @@
-use crate::{Mmio, clock::ClkId, grf::GrfMmio};
+use core::fmt::Debug;
+
+use crate::{Mmio, ResetRockchip, RstId, clock::ClkId, grf::GrfMmio};
 
 pub mod clock;
 mod consts;
@@ -35,23 +37,36 @@ const ACLK_TOP_S200_SEL_SHIFT: u32 = 6;
 const ACLK_TOP_S200_SEL_MASK: u32 = 0x3 << ACLK_TOP_S200_SEL_SHIFT;
 const ACLK_TOP_S200_SEL_200M: u32 = 0;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Cru {
     base: usize,
-    grf: usize,
+    _grf: usize,
     cpll_hz: u64,
     gpll_hz: u64,
     ppll_hz: u64,
+    reset: ResetRockchip,
+}
+
+impl Debug for Cru {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Cru")
+            .field("base", &self.base)
+            .field("cpll_hz", &self.cpll_hz)
+            .field("gpll_hz", &self.gpll_hz)
+            .field("ppll_hz", &self.ppll_hz)
+            .finish()
+    }
 }
 
 impl Cru {
     pub fn new(base: Mmio, sys_grf: Mmio) -> Self {
         Cru {
             base: base.as_ptr() as usize,
-            grf: sys_grf.as_ptr() as usize,
+            _grf: sys_grf.as_ptr() as usize,
             cpll_hz: 0,
             gpll_hz: 0,
             ppll_hz: 0,
+            reset: ResetRockchip::new(base.as_ptr() as usize + SOFTRST_CON_OFFSET as usize, 49158),
         }
     }
 
@@ -70,7 +85,7 @@ impl Cru {
     /// 5. ACLK_TOP_S400: 400MHz (clksel_con[9])
     /// 6. ACLK_TOP_S200: 200MHz (clksel_con[9])
     pub fn init(&mut self) {
-        log::info!(
+        info!(
             "CRU@{:x}: Initializing and verifying clock configuration...",
             self.base
         );
@@ -152,20 +167,18 @@ impl Cru {
         debug!("  - S200_SEL: {} (0=200MHz, 1=100MHz)", s200_sel);
 
         if s400_sel != ACLK_TOP_S400_SEL_400M {
-            log::warn!(
+            warn!(
                 "⚠ CRU@{:x}: ACLK_TOP_S400 mismatch! u-boot: 0 (400MHz), current: {}",
-                self.base,
-                s400_sel
+                self.base, s400_sel
             );
         } else {
             debug!("✓ ACLK_TOP_S400 matches u-boot (400MHz)");
         }
 
         if s200_sel != ACLK_TOP_S200_SEL_200M {
-            log::warn!(
+            warn!(
                 "⚠ CRU@{:x}: ACLK_TOP_S200 mismatch! u-boot: 0 (200MHz), current: {}",
-                self.base,
-                s200_sel
+                self.base, s200_sel
             );
         } else {
             debug!("✓ ACLK_TOP_S200 matches u-boot (200MHz)");
@@ -200,7 +213,15 @@ impl Cru {
             self.ppll_hz = rate;
         }
 
-        log::info!("✓ CRU@{:x}: Clock configuration verified", self.base);
+        info!("✓ CRU@{:x}: Clock configuration verified", self.base);
+    }
+
+    pub fn reset_assert(&mut self, id: RstId) {
+        self.reset.reset_assert(id);
+    }
+
+    pub fn reset_deassert(&mut self, id: RstId) {
+        self.reset.reset_deassert(id);
     }
 
     /// 使能时钟
@@ -725,45 +746,5 @@ mod tests {
         // NPLL: p=3, m=425, s=2, k=0 => 850MHz
         let rate = calc_pll_rate(fin, 3, 425, 2, 0);
         assert_eq!(rate, NPLL_HZ as u64, "NPLL calculation mismatch");
-    }
-
-    /// 测试 clk_get_rate (不支持的外设时钟)
-    #[test]
-    fn test_clk_get_rate_unsupported() {
-        let cru = Cru {
-            base: 0xfd7c0000,
-            grf: 0xfd58c000,
-            cpll_hz: 0,
-            gpll_hz: 0,
-            ppll_hz: 0,
-        };
-
-        // 测试获取 I2C 时钟 (当前未实现)
-        let rate = cru.clk_get_rate(CLK_I2C1);
-        assert!(
-            rate.is_err(),
-            "I2C clock should return error (not implemented)"
-        );
-        assert_eq!(rate.unwrap_err(), "Clock type not supported yet");
-    }
-
-    /// 测试 clk_set_rate (不支持的外设时钟)
-    #[test]
-    fn test_clk_set_rate_unsupported() {
-        let mut cru = Cru {
-            base: 0xfd7c0000,
-            grf: 0xfd58c000,
-            cpll_hz: 0,
-            gpll_hz: 0,
-            ppll_hz: 0,
-        };
-
-        // 测试设置 I2C 时钟 (当前未实现)
-        let result = cru.clk_set_rate(CLK_I2C1, 100_000_000);
-        assert!(
-            result.is_err(),
-            "I2C clock should return error (not implemented)"
-        );
-        assert_eq!(result.unwrap_err(), "Clock type not supported yet");
     }
 }

@@ -45,6 +45,8 @@ pub const RK3588_MODE_CON0: u32 = 0x280;
 /// clksel_con 寄存器基址偏移
 pub const CLKSEL_CON_OFFSET: u32 = 0x0300;
 
+pub const SOFTRST_CON_OFFSET: u32 = 0x0a00;
+
 /// 时钟选择寄存器偏移
 pub const fn clksel_con(x: u32) -> u32 {
     (x * 0x4) + CLKSEL_CON_OFFSET
@@ -57,7 +59,7 @@ pub const fn clkgate_con(x: u32) -> u32 {
 
 /// 软件复位寄存器偏移
 pub const fn softrst_con(x: u32) -> u32 {
-    x * 0x4 + 0xa00
+    x * 0x4 + SOFTRST_CON_OFFSET
 }
 
 /// 全局计数阈值寄存器

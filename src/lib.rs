@@ -10,6 +10,7 @@ extern crate log;
 mod grf;
 
 mod clock;
+mod rst;
 mod syscon;
 mod variants;
 
@@ -18,3 +19,4 @@ use core::ptr::NonNull;
 pub use variants::*;
 
 pub type Mmio = NonNull<u8>;
+pub use rst::{ResetRockchip, RstId};
