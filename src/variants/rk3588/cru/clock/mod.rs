@@ -260,6 +260,15 @@ clk_id_group!(
     UTMI_OHCI_CLK48_HOST1 = 424,
 );
 
+clk_id_group!(
+    PCLK_USBDPPHY0 = 617,
+    PCLK_USBDPPHY1 = 618,
+    USBDP_PHY0_IMMORTAL = 639,
+    USBDP_PHY1_IMMORTAL = 640,
+);
+
+clk_id_group!(USBDPPHY_MIPIDCPPHY_REF = 694,);
+
 // =============================================================================
 // 辅助函数：时钟类型判断和外设编号提取
 // =============================================================================

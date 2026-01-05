@@ -15,11 +15,18 @@ use super::consts::*;
 use crate::clock::ClkId;
 use crate::rk3588::cru::*;
 
+#[derive(Debug, Clone, Copy)]
+pub enum ClkType {
+    Gate,
+    Composite,
+}
+
 /// 时钟门控配置
 #[derive(Debug, Clone, Copy)]
 pub struct ClkGate {
     /// 时钟 ID
     pub clk_id: ClkId,
+    pub kind: ClkType,
     /// 寄存器索引 (0-31 用于 clkgate_con, 32+ 用于 pmu_clkgate_con)
     pub reg_idx: u32,
     /// 位偏移 (0-15)
@@ -46,6 +53,23 @@ macro_rules! clk_gate_table {
             $(
                 ClkGate {
                     clk_id: $clk_id,
+                    kind: ClkType::Gate,
+                    reg_idx: $reg_idx,
+                    bit: $bit,
+                }
+                ),*
+        ];
+    };
+}
+
+macro_rules! clk_composite_table {
+    ($($clk_id:expr => ($reg_idx:expr, $bit:expr)),* $(,)?) => {
+        #[allow(non_upper_case_globals)]
+        const CLK_COMPOSITE_TABLE: &[ClkGate] = &[
+            $(
+                ClkGate {
+                    clk_id: $clk_id,
+                    kind: ClkType::Composite,
                     reg_idx: $reg_idx,
                     bit: $bit,
                 }
@@ -162,6 +186,18 @@ clk_gate_table!(
     HCLK_HOST_ARB0 => (42, 11),
     HCLK_HOST1 => (42, 12),
     HCLK_HOST_ARB1 => (42, 13),
+
+    USBDP_PHY0_IMMORTAL => (2, 8),
+    USBDP_PHY1_IMMORTAL => (2, 15),
+
+    PCLK_USBDPPHY0 => (72, 2),
+    PCLK_USBDPPHY1 => (72, 4),
+
+
+);
+
+clk_composite_table!(
+    USBDPPHY_MIPIDCPPHY_REF => (4, 3),
 );
 
 // =============================================================================
@@ -171,7 +207,15 @@ clk_gate_table!(
 impl Cru {
     /// 查找时钟门控配置
     pub fn find_clk_gate(&self, id: ClkId) -> Option<ClkGate> {
-        CLK_GATE_TABLE
+        if let Some(res) = CLK_GATE_TABLE
+            .iter()
+            .find(|gate| gate.clk_id == id)
+            .copied()
+        {
+            return Some(res);
+        }
+
+        CLK_COMPOSITE_TABLE
             .iter()
             .find(|gate| gate.clk_id == id)
             .copied()
