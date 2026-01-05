@@ -29,7 +29,7 @@ impl From<RstId> for u64 {
 
 impl core::fmt::Display for RstId {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "RstId({})", self.0)
+        write!(f, "RstId({:#x})", self.0)
     }
 }
 
@@ -72,7 +72,7 @@ impl ResetRockchip {
         let bank = id.value() / 16;
         let offset = id.value() % 16;
         let addr = self.base + (bank as usize * 4);
-        debug!("reset (id={id}) (reg_addr={addr:#x})\n",);
+        debug!("reset (id={id}) (reg_addr={addr:#x})",);
 
         unsafe {
             let reg = addr as *mut u32;
