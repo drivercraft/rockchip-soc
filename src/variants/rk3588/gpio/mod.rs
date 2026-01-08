@@ -8,6 +8,7 @@ mod reg;
 
 use core::fmt;
 use reg::*;
+use tock_registers::interfaces::{Readable, Writeable};
 
 /// GPIO 错误类型
 #[derive(Debug)]
@@ -78,12 +79,8 @@ impl GpioBank {
         }
 
         let mask = 1u32 << pin_in_bank;
-        // 清除方向寄存器的对应位（设置为输入）
-        unsafe {
-            let reg_ptr = &self.reg().swport_ddr as *const _ as *mut u32;
-            let current = reg_ptr.read_volatile();
-            reg_ptr.write_volatile(current & !mask);
-        }
+        let current = self.reg().swport_ddr.get();
+        self.reg().swport_ddr.set(current & !mask);
 
         Ok(())
     }
@@ -102,22 +99,18 @@ impl GpioBank {
 
         let mask = 1u32 << pin_in_bank;
 
-        unsafe {
-            // 先设置输出值
-            let dr_ptr = &self.reg().swport_dr as *const _ as *mut u32;
-            let current_dr = dr_ptr.read_volatile();
-            let new_dr = if value {
-                current_dr | mask
-            } else {
-                current_dr & !mask
-            };
-            dr_ptr.write_volatile(new_dr);
+        // 设置初始输出值
+        let current_dr = self.reg().swport_dr.get();
+        let new_dr = if value {
+            current_dr | mask
+        } else {
+            current_dr & !mask
+        };
+        self.reg().swport_dr.set(new_dr);
 
-            // 再设置方向为输出
-            let ddr_ptr = &self.reg().swport_ddr as *const _ as *mut u32;
-            let current_ddr = ddr_ptr.read_volatile();
-            ddr_ptr.write_volatile(current_ddr | mask);
-        }
+        // 设置为输出
+        let current_ddr = self.reg().swport_ddr.get();
+        self.reg().swport_ddr.set(current_ddr | mask);
 
         Ok(())
     }
@@ -133,11 +126,7 @@ impl GpioBank {
         }
 
         let mask = 1u32 << pin_in_bank;
-        let value = unsafe {
-            let reg_ptr = &self.reg().ext_port as *const _ as *const u32;
-            reg_ptr.read_volatile()
-        };
-
+        let value = self.reg().ext_port.get();
         Ok((value & mask) != 0)
     }
 
@@ -155,17 +144,13 @@ impl GpioBank {
         }
 
         let mask = 1u32 << pin_in_bank;
-
-        unsafe {
-            let reg_ptr = &self.reg().swport_dr as *const _ as *mut u32;
-            let current = reg_ptr.read_volatile();
-            let new_value = if value {
-                current | mask
-            } else {
-                current & !mask
-            };
-            reg_ptr.write_volatile(new_value);
-        }
+        let current = self.reg().swport_dr.get();
+        let new_value = if value {
+            current | mask
+        } else {
+            current & !mask
+        };
+        self.reg().swport_dr.set(new_value);
 
         Ok(())
     }
@@ -191,17 +176,11 @@ impl GpioBank {
         let mask = 1u32 << pin_in_bank;
 
         // 读取方向寄存器
-        let ddr_value = unsafe {
-            let reg_ptr = &self.reg().swport_ddr as *const _ as *const u32;
-            reg_ptr.read_volatile()
-        };
+        let ddr_value = self.reg().swport_ddr.get();
 
         if (ddr_value & mask) != 0 {
             // 输出方向：同时读取输出值
-            let dr_value = unsafe {
-                let reg_ptr = &self.reg().swport_dr as *const _ as *const u32;
-                reg_ptr.read_volatile()
-            };
+            let dr_value = self.reg().swport_dr.get();
             Ok(GpioDirection::Output((dr_value & mask) != 0))
         } else {
             // 输入方向
