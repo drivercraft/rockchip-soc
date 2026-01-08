@@ -175,9 +175,19 @@ impl Pinctrl {
             reg_ptr.read_volatile()
         };
 
+        log::info!(
+            "get_mux: pin={}, reg_offset={:#x}, bit_offset={}, reg_value={:#x}",
+            pin.raw(),
+            config.reg_offset,
+            config.bit_offset,
+            reg_value
+        );
+
         // 提取功能配置字段（每个引脚占 4 位）
         let mask = 0xfu32 << config.bit_offset;
         let func_num = (reg_value & mask) >> config.bit_offset;
+
+        log::info!("get_mux: func_num={}, mask={:#x}", func_num, mask);
 
         // 转换为 Function 枚举
         Function::from_num(func_num).ok_or(PinctrlError::InvalidConfig)
@@ -206,16 +216,29 @@ impl Pinctrl {
             reg_ptr.read_volatile()
         };
 
+        log::info!(
+            "get_pull: pin={}, reg_offset={:#x}, bit_offset={}, reg_value={:#x}",
+            pin.raw(),
+            reg_offset,
+            bit_offset,
+            reg_value
+        );
+
         // 提取 pull 配置字段（每个 pull 占 2 位）
         let mask = 0x3u32 << bit_offset;
         let pull_value = (reg_value & mask) >> bit_offset;
+
+        log::info!("get_pull: pull_value={}, mask={:#x}", pull_value, mask);
 
         // 转换为 Pull 枚举
         match pull_value {
             0 => Ok(Pull::Disabled),
             1 => Ok(Pull::PullUp),
             2 => Ok(Pull::PullDown),
-            _ => Err(PinctrlError::InvalidConfig),
+            _ => {
+                log::warn!("Invalid pull value {} for pin {}", pull_value, pin.raw());
+                Err(PinctrlError::InvalidConfig)
+            }
         }
     }
 
@@ -242,9 +265,19 @@ impl Pinctrl {
             reg_ptr.read_volatile()
         };
 
+        log::info!(
+            "get_drive: pin={}, reg_offset={:#x}, bit_offset={}, reg_value={:#x}",
+            pin.raw(),
+            reg_offset,
+            bit_offset,
+            reg_value
+        );
+
         // 提取 drive 配置字段（每个 drive 占 2 位）
         let mask = 0x3u32 << bit_offset;
         let drive_value = (reg_value & mask) >> bit_offset;
+
+        log::info!("get_drive: drive_value={}, mask={:#x}", drive_value, mask);
 
         // 转换为 DriveStrength 枚举
         match drive_value {
@@ -252,7 +285,10 @@ impl Pinctrl {
             1 => Ok(DriveStrength::Ma4),
             2 => Ok(DriveStrength::Ma8),
             3 => Ok(DriveStrength::Ma12),
-            _ => Err(PinctrlError::InvalidConfig),
+            _ => {
+                log::warn!("Invalid drive value {} for pin {}", drive_value, pin.raw());
+                Err(PinctrlError::InvalidConfig)
+            }
         }
     }
 }
