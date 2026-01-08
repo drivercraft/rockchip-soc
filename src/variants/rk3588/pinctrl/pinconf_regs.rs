@@ -229,7 +229,7 @@ pub fn find_schmitt_entry(pin: PinId) -> Option<(usize, u32)> {
         .find(|e| e.pin_id.raw() <= pin_num)?;
 
     // 计算位偏移（每个引脚 1 位）
-    let pin_offset = (pin_num - entry.pin_id.raw()) as u32;
+    let pin_offset = pin_num - entry.pin_id.raw();
     let bit_offset = pin_offset;
 
     Some((entry.reg_offset, bit_offset))
