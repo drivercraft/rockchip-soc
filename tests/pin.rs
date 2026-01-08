@@ -39,25 +39,21 @@ pub fn test_pin() {
     info!("Pull: {:?}", config.pull);
     info!("Drive: {:?}", config.drive);
 
-    // 验证 Function 是否为 GPIO
+    // 验证 Function 是否为 Alt10 (UART3_TX_M1)
     assert!(
-        matches!(config.function, Function::Gpio(_)),
-        "Function should be GPIO, got {:?}",
+        matches!(config.function, Function::Alt10),
+        "Function should be Alt10 (UART3_TX_M1), got {:?}",
         config.function
     );
+    info!("✓ u-boot configured pin as UART3_TX_M1 (Alt10)");
 
-    // 从 Function 中提取并验证 GPIO 方向
-    if let Function::Gpio(direction) = config.function {
-        info!("GPIO Direction: {:?}", direction);
-    }
-
-    // 读取并显示引脚实际电平值
+    // 读取并显示引脚实际电平值（即使不是 GPIO 功能）
     let level = pinctrl
         .read_gpio(test_pin)
         .expect("Failed to read GPIO level");
     info!("GPIO Actual Level: {}", level);
 
-    // 测试输出配置
+    // 测试输出配置 - 将引脚配置为 GPIO
     info!("\n=== Testing Output Configuration ===");
     pinctrl
         .config_peripheral(PinConfig {
