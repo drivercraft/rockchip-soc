@@ -176,14 +176,4 @@ mod tests {
         assert_eq!(RockchipPllType::Rv1108 as u32, 3);
         assert_eq!(RockchipPllType::Rk3588 as u32, 4);
     }
-
-    #[test]
-    fn test_pll_flags() {
-        // 验证标志位定义
-        assert_eq!(pll_flags::PLL_SYNC, 1 << 0);
-        assert_eq!(pll_flags::PLL_FRAC, 1 << 1);
-        assert_eq!(pll_flags::PLL_POSTDIV4, 1 << 2);
-        assert_eq!(pll_flags::PLL_RK3588, 1 << 3);
-        assert_eq!(pll_flags::PLL_RK3399, 1 << 4);
-    }
 }

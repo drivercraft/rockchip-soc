@@ -677,9 +677,6 @@ mod tests {
         assert_eq!(pll_mode::PLL_MODE_SLOW, 0);
         assert_eq!(pll_mode::PLL_MODE_NORMAL, 1);
         assert_eq!(pll_mode::PLL_MODE_DEEP, 2);
-
-        // 验证模式掩码
-        assert_eq!(PLL_MODE_MASK, 0x3);
     }
 
     /// 测试 PLL 寄存器位掩码

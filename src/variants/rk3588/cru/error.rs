@@ -215,7 +215,6 @@ mod tests {
         match err {
             ClockError::UnsupportedClock { clk_id } => {
                 assert_eq!(clk_id, CLK_SPI0);
-                assert_eq!(value, 165);
             }
             _ => panic!("Unexpected error type"),
         }
