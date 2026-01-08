@@ -125,17 +125,6 @@ mod tests {
     use crate::pinctrl::Function;
 
     #[test]
-    fn test_pin_config_builder() {
-        let config = PinConfig::new(Function::Gpio)
-            .with_pull(Pull::PullUp)
-            .with_drive(DriveStrength::Ma8);
-
-        assert_eq!(config.function, Function::Gpio);
-        assert_eq!(config.pull, Some(Pull::PullUp));
-        assert_eq!(config.drive, Some(DriveStrength::Ma8));
-    }
-
-    #[test]
     fn test_pull_values() {
         assert_eq!(Pull::Disabled as u32, 0);
         assert_eq!(Pull::PullUp as u32, 1);

@@ -15,6 +15,13 @@ pub use pinmux::Function;
 // 重新导出所有 GPIO 常量
 pub use id::*;
 
+/// GPIO 方向配置（用于设置方向）
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GpioDirection {
+    Input,
+    Output(bool), // 携带初始输出值
+}
+
 /// Pinctrl 错误类型
 #[derive(Debug)]
 pub enum PinctrlError {

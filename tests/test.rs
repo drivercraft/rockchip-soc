@@ -5,11 +5,13 @@
 extern crate alloc;
 extern crate bare_test;
 
+mod pin;
+
 #[bare_test::tests]
 mod tests {
     use core::ptr::NonNull;
 
-    use alloc::{boxed::Box, vec::Vec};
+    use alloc::vec::Vec;
     use bare_test::{
         globals::{PlatformInfoKind, global_val},
         mem::{iomap, page_size},
@@ -23,6 +25,8 @@ mod tests {
         clock::{Clk, ClkError, init_global_clk},
     };
     use spin::{Mutex, Once};
+
+    use crate::pin::test_pin;
 
     static INIT: Once<Mutex<Cru>> = Once::new();
 
@@ -44,6 +48,7 @@ mod tests {
         initclk(cru);
 
         test_with_emmc();
+        test_pin();
     }
 
     fn test_with_emmc() {

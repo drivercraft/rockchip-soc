@@ -48,25 +48,6 @@ impl Pinctrl {
         Self { ioc_base }
     }
 
-    /// 配置单个引脚（完整配置）
-    ///
-    /// 一次性配置引脚的功能、上下拉和驱动强度。
-    ///
-    /// # 参数
-    ///
-    /// * `pin` - 引脚 ID
-    /// * `config` - 引脚配置
-    pub fn config_pin(&self, pin: PinId, config: &PinConfig) -> PinctrlResult<()> {
-        self.set_mux(pin, config.function)?;
-        if let Some(pull) = config.pull {
-            self.set_pull(pin, pull)?;
-        }
-        if let Some(drive) = config.drive {
-            self.set_drive(pin, drive)?;
-        }
-        Ok(())
-    }
-
     /// 设置引脚功能（pinmux）
     ///
     /// 配置引脚的复用功能（GPIO、UART、SPI 等）。
@@ -88,7 +69,7 @@ impl Pinctrl {
         // Rockchip 写掩码机制：高16位清除，低16位设置
         // 每个引脚占 4 位，掩码为 0xf
         let mask = 0xfu32 << config.bit_offset;
-        let value = function.raw() << config.bit_offset;
+        let value = function.num() << config.bit_offset;
 
         unsafe {
             let reg_ptr = self.ioc_base.as_ptr().add(config.reg_offset) as *mut u32;
@@ -98,7 +79,7 @@ impl Pinctrl {
         // 如果需要双寄存器配置（GPIO0 的某些引脚）
         if let Some(extra) = extra_config {
             let mask = 0xfu32 << extra.bit_offset;
-            let value = function.raw() << extra.bit_offset;
+            let value = function.num() << extra.bit_offset;
 
             unsafe {
                 let reg_ptr = self.ioc_base.as_ptr().add(extra.reg_offset) as *mut u32;
@@ -169,5 +150,109 @@ impl Pinctrl {
         }
 
         Ok(())
+    }
+
+    /// 读取引脚功能（pinmux）
+    ///
+    /// 读取引脚当前的复用功能配置。
+    ///
+    /// # 参数
+    ///
+    /// * `pin` - 引脚 ID
+    ///
+    /// # 返回
+    ///
+    /// 返回引脚当前的功能配置
+    pub fn get_mux(&self, pin: PinId) -> PinctrlResult<Function> {
+        use crate::variants::rk3588::pinctrl::iomux::calc_iomux_config;
+
+        let (config, _extra_config) =
+            calc_iomux_config(pin).ok_or(PinctrlError::InvalidPinId(pin.raw()))?;
+
+        // 读取寄存器值
+        let reg_value = unsafe {
+            let reg_ptr = self.ioc_base.as_ptr().add(config.reg_offset) as *const u32;
+            reg_ptr.read_volatile()
+        };
+
+        // 提取功能配置字段（每个引脚占 4 位）
+        let mask = 0xfu32 << config.bit_offset;
+        let func_num = (reg_value & mask) >> config.bit_offset;
+
+        // 转换为 Function 枚举
+        Function::from_num(func_num).ok_or(PinctrlError::InvalidConfig)
+    }
+
+    /// 读取 pull 配置
+    ///
+    /// 读取引脚当前的上下拉配置。
+    ///
+    /// # 参数
+    ///
+    /// * `pin` - 引脚 ID
+    ///
+    /// # 返回
+    ///
+    /// 返回引脚当前的上下拉配置
+    pub fn get_pull(&self, pin: PinId) -> PinctrlResult<Pull> {
+        use crate::variants::rk3588::pinctrl::pinconf_regs::find_pull_entry;
+
+        let (reg_offset, bit_offset) =
+            find_pull_entry(pin).ok_or(PinctrlError::InvalidPinId(pin.raw()))?;
+
+        // 读取寄存器值
+        let reg_value = unsafe {
+            let reg_ptr = self.ioc_base.as_ptr().add(reg_offset) as *const u32;
+            reg_ptr.read_volatile()
+        };
+
+        // 提取 pull 配置字段（每个 pull 占 2 位）
+        let mask = 0x3u32 << bit_offset;
+        let pull_value = (reg_value & mask) >> bit_offset;
+
+        // 转换为 Pull 枚举
+        match pull_value {
+            0 => Ok(Pull::Disabled),
+            1 => Ok(Pull::PullUp),
+            2 => Ok(Pull::PullDown),
+            _ => Err(PinctrlError::InvalidConfig),
+        }
+    }
+
+    /// 读取 drive strength
+    ///
+    /// 读取引脚当前的驱动强度配置。
+    ///
+    /// # 参数
+    ///
+    /// * `pin` - 引脚 ID
+    ///
+    /// # 返回
+    ///
+    /// 返回引脚当前的驱动强度配置
+    pub fn get_drive(&self, pin: PinId) -> PinctrlResult<DriveStrength> {
+        use crate::variants::rk3588::pinctrl::pinconf_regs::find_drive_entry;
+
+        let (reg_offset, bit_offset) =
+            find_drive_entry(pin).ok_or(PinctrlError::InvalidPinId(pin.raw()))?;
+
+        // 读取寄存器值
+        let reg_value = unsafe {
+            let reg_ptr = self.ioc_base.as_ptr().add(reg_offset) as *const u32;
+            reg_ptr.read_volatile()
+        };
+
+        // 提取 drive 配置字段（每个 drive 占 2 位）
+        let mask = 0x3u32 << bit_offset;
+        let drive_value = (reg_value & mask) >> bit_offset;
+
+        // 转换为 DriveStrength 枚举
+        match drive_value {
+            0 => Ok(DriveStrength::Ma2),
+            1 => Ok(DriveStrength::Ma4),
+            2 => Ok(DriveStrength::Ma8),
+            3 => Ok(DriveStrength::Ma12),
+            _ => Err(PinctrlError::InvalidConfig),
+        }
     }
 }

@@ -2,19 +2,12 @@ pub mod consts;
 
 use consts::*;
 
-use crate::Mmio;
+use crate::{GpioDirection, Mmio};
 
 mod reg;
 
 use core::fmt;
 use reg::*;
-
-/// GPIO 方向
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Direction {
-    Input,
-    Output,
-}
 
 /// GPIO 错误类型
 #[derive(Debug)]
@@ -53,11 +46,32 @@ impl GpioBank {
         unsafe { &*(self.base as *const Registers) }
     }
 
+    /// 设置引脚方向（统一接口）
+    ///
+    /// # 参数
+    ///
+    /// * `pin_in_bank` - Bank 内的引脚编号 (0-31)
+    /// * `config` - 方向配置（输入或输出带初始值）
+    ///
+    /// # 示例
+    ///
+    /// ```ignore
+    /// bank.set_direction(5, DirectionConfig::Input)?;
+    /// bank.set_direction(5, DirectionConfig::Output(true))?;  // 输出，初始值 HIGH
+    /// ```
+    pub fn set_direction(&self, pin_in_bank: u32, direction: GpioDirection) -> GpioResult<()> {
+        match direction {
+            GpioDirection::Input => self.set_direction_input(pin_in_bank),
+            GpioDirection::Output(value) => self.set_direction_output(pin_in_bank, value),
+        }
+    }
+
     /// 设置引脚为输入方向
     ///
     /// # 参数
     ///
     /// * `pin_in_bank` - Bank 内的引脚编号 (0-31)
+    #[inline]
     pub fn set_direction_input(&self, pin_in_bank: u32) -> GpioResult<()> {
         if pin_in_bank >= 32 {
             return Err(GpioError::InvalidPin(pin_in_bank));
@@ -80,6 +94,7 @@ impl GpioBank {
     ///
     /// * `pin_in_bank` - Bank 内的引脚编号 (0-31)
     /// * `value` - 初始输出值
+    #[inline]
     pub fn set_direction_output(&self, pin_in_bank: u32, value: bool) -> GpioResult<()> {
         if pin_in_bank >= 32 {
             return Err(GpioError::InvalidPin(pin_in_bank));
@@ -155,26 +170,42 @@ impl GpioBank {
         Ok(())
     }
 
-    /// 获取引脚方向
+    /// 获取引脚方向配置
+    ///
+    /// 如果引脚配置为输出，同时返回当前输出值。
     ///
     /// # 参数
     ///
     /// * `pin_in_bank` - Bank 内的引脚编号 (0-31)
-    pub fn get_direction(&self, pin_in_bank: u32) -> GpioResult<Direction> {
+    ///
+    /// # 返回
+    ///
+    /// 返回 `DirectionConfig`：
+    /// - `Input` - 引脚配置为输入
+    /// - `Output(value)` - 引脚配置为输出，value 为当前输出值
+    pub fn get_direction(&self, pin_in_bank: u32) -> GpioResult<GpioDirection> {
         if pin_in_bank >= 32 {
             return Err(GpioError::InvalidPin(pin_in_bank));
         }
 
         let mask = 1u32 << pin_in_bank;
+
+        // 读取方向寄存器
         let ddr_value = unsafe {
             let reg_ptr = &self.reg().swport_ddr as *const _ as *const u32;
             reg_ptr.read_volatile()
         };
 
         if (ddr_value & mask) != 0 {
-            Ok(Direction::Output)
+            // 输出方向：同时读取输出值
+            let dr_value = unsafe {
+                let reg_ptr = &self.reg().swport_dr as *const _ as *const u32;
+                reg_ptr.read_volatile()
+            };
+            Ok(GpioDirection::Output((dr_value & mask) != 0))
         } else {
-            Ok(Direction::Input)
+            // 输入方向
+            Ok(GpioDirection::Input)
         }
     }
 }

@@ -3,10 +3,31 @@
 //! 统一的引脚管理器，整合 Pinctrl 和 GpioBank，提供简洁易用的引脚配置和 GPIO 操作接口。
 
 use crate::{
-    Mmio, PinId,
+    GpioDirection, Mmio, PinId,
     pinctrl::{BankId, DriveStrength, Function, PinctrlError, PinctrlResult, Pull},
     variants::rk3588::{gpio::GpioBank, pinctrl::Pinctrl},
 };
+
+/// 引脚配置信息
+///
+/// 包含引脚的完整配置状态，用于调试和验证。
+///
+/// 根据 u-boot 代码分析，pull 和 drive 在所有模式下（GPIO 和 Alt function）都需要配置：
+/// - UART: pull_up
+/// - I2C: pull_none_smt
+/// - SPI: pull_none
+/// - GPIO: 根据应用场景配置
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PinConfig {
+    /// 引脚 ID
+    pub pin_id: PinId,
+    /// 引脚功能
+    pub function: Function,
+    /// 上下拉配置（所有模式都需要）
+    pub pull: Pull,
+    /// 驱动强度（所有模式都需要）
+    pub drive: DriveStrength,
+}
 
 /// 统一的引脚管理器
 ///
@@ -41,14 +62,12 @@ unsafe impl Send for PinManager {}
 impl PinManager {
     /// 创建新的 PinManager
     ///
-    /// # Safety
-    ///
     /// IOC 和 GPIO 寄存器地址必须有效且在生命周期内保持可访问
     ///
     /// 寄存器地址参考设备树：
     /// - IOC: 0xfd5f0000 (syscon@fd5f0000)
     /// - GPIO0-4: 0xfd8a0000, 0xfec20000, 0xfec30000, 0xfec40000, 0xfec50000
-    pub unsafe fn new(ioc: Mmio, gpio: [Mmio; 5]) -> Self {
+    pub fn new(ioc: Mmio, gpio: [Mmio; 5]) -> Self {
         Self {
             pinctrl: unsafe { Pinctrl::new(ioc) },
             gpio_banks: [
@@ -59,83 +78,6 @@ impl PinManager {
                 GpioBank::new(gpio[4]), // GPIO4 (Pin 128-159)
             ],
         }
-    }
-
-    /// 配置引脚为 GPIO 并设置方向为输入
-    ///
-    /// # 参数
-    ///
-    /// * `pin` - 引脚 ID
-    /// * `pull` - 上下拉配置
-    ///
-    /// # 示例
-    ///
-    /// ```ignore
-    /// use rockchip_soc::pinctrl::{PinId, Pull};
-    ///
-    /// // 配置 GPIO0_A1 为输入，上拉
-    /// let pin = PinId::new(1).unwrap();
-    /// manager.config_gpio_input(pin, Pull::PullUp)?;
-    /// ```
-    pub fn config_gpio_input(&self, pin: PinId, pull: Pull) -> PinctrlResult<()> {
-        // 1. 配置为 GPIO 功能
-        self.pinctrl.set_mux(pin, Function::Gpio)?;
-
-        // 2. 配置上下拉
-        self.pinctrl.set_pull(pin, pull)?;
-
-        // 3. 设置为输入方向
-        let bank_id = pin.bank().raw() as usize;
-        let pin_in_bank = pin.pin_in_bank();
-        self.gpio_banks[bank_id]
-            .set_direction_input(pin_in_bank)
-            .map_err(|e| match e {
-                crate::variants::rk3588::gpio::GpioError::InvalidPin(p) => {
-                    PinctrlError::InvalidPinId(pin.raw())
-                }
-                _ => PinctrlError::InvalidConfig,
-            })?;
-
-        Ok(())
-    }
-
-    /// 配置引脚为 GPIO 并设置方向为输出（初始值）
-    ///
-    /// # 参数
-    ///
-    /// * `pin` - 引脚 ID
-    /// * `pull` - 上下拉配置
-    /// * `value` - 初始输出值
-    ///
-    /// # 示例
-    ///
-    /// ```ignore
-    /// use rockchip_soc::pinctrl::{PinId, Pull};
-    ///
-    /// // 配置 GPIO0_A0 为输出，上拉，初始高电平
-    /// let pin = PinId::new(0).unwrap();
-    /// manager.config_gpio_output(pin, Pull::PullUp, true)?;
-    /// ```
-    pub fn config_gpio_output(&self, pin: PinId, pull: Pull, value: bool) -> PinctrlResult<()> {
-        // 1. 配置为 GPIO 功能
-        self.pinctrl.set_mux(pin, Function::Gpio)?;
-
-        // 2. 配置上下拉
-        self.pinctrl.set_pull(pin, pull)?;
-
-        // 3. 设置为输出方向并写入初始值
-        let bank_id = pin.bank().raw() as usize;
-        let pin_in_bank = pin.pin_in_bank();
-        self.gpio_banks[bank_id]
-            .set_direction_output(pin_in_bank, value)
-            .map_err(|e| match e {
-                crate::variants::rk3588::gpio::GpioError::InvalidPin(p) => {
-                    PinctrlError::InvalidPinId(pin.raw())
-                }
-                _ => PinctrlError::InvalidConfig,
-            })?;
-
-        Ok(())
     }
 
     /// 读取 GPIO 引脚值
@@ -208,21 +150,21 @@ impl PinManager {
     ///     Some(DriveStrength::Ma8),
     /// )?;
     /// ```
-    pub fn config_peripheral(
-        &self,
-        pin: PinId,
-        function: Function,
-        pull: Option<Pull>,
-        drive: Option<DriveStrength>,
-    ) -> PinctrlResult<()> {
-        self.pinctrl.set_mux(pin, function)?;
+    pub fn config_peripheral(&self, config: PinConfig) -> PinctrlResult<()> {
+        self.pinctrl.set_mux(config.pin_id, config.function)?;
 
-        if let Some(p) = pull {
-            self.pinctrl.set_pull(pin, p)?;
-        }
+        self.pinctrl.set_pull(config.pin_id, config.pull)?;
 
-        if let Some(d) = drive {
-            self.pinctrl.set_drive(pin, d)?;
+        self.pinctrl.set_drive(config.pin_id, config.drive)?;
+
+        if let Function::Gpio(dir) = config.function {
+            let bank = self
+                .gpio_bank(config.pin_id.bank())
+                .ok_or(PinctrlError::InvalidPinId(config.pin_id.raw()))?;
+            let pin_in_bank = config.pin_id.pin_in_bank();
+
+            bank.set_direction(pin_in_bank, dir)
+                .map_err(|_e| PinctrlError::InvalidConfig)?;
         }
 
         Ok(())
@@ -257,6 +199,60 @@ impl PinManager {
     /// 如果 bank_id 有效，返回 Some(&GpioBank)，否则返回 None
     pub fn gpio_bank(&self, bank_id: BankId) -> Option<&GpioBank> {
         self.gpio_banks.get(bank_id.raw() as usize)
+    }
+
+    /// 获取引脚的完整配置信息
+    ///
+    /// 读取引脚的所有配置状态，包括功能、上下拉、驱动强度和 GPIO 方向等。
+    /// 用于调试和验证引脚配置是否符合预期。
+    ///
+    /// # 参数
+    ///
+    /// * `pin` - 引脚 ID
+    ///
+    /// # 返回
+    ///
+    /// 返回 `PinConfig` 结构体，包含引脚的完整配置信息。
+    ///
+    /// # 示例
+    ///
+    /// ```ignore
+    /// use rockchip_soc::GPIO3_B6;
+    ///
+    /// // 获取引脚配置
+    /// let config = manager.get_pin_config(GPIO3_B6)?;
+    /// println!("Pin {}: {:?}", config.pin_id, config.gpio_direction);
+    /// ```
+    pub fn get_pin_config(&self, pin: PinId) -> PinctrlResult<PinConfig> {
+        // 从寄存器读取引脚功能配置
+        let mut function = self.pinctrl.get_mux(pin)?;
+
+        // 从寄存器读取上下拉配置
+        let pull = self.pinctrl.get_pull(pin)?;
+
+        // 从寄存器读取驱动强度配置
+        let drive = self.pinctrl.get_drive(pin)?;
+
+        if let Function::Gpio(dir) = &mut function {
+            // 如果是 GPIO 功能，获取实际的 GPIO 方向
+            let bank = self
+                .gpio_bank(pin.bank())
+                .ok_or(PinctrlError::InvalidPinId(pin.raw()))?;
+            let pin_in_bank = pin.pin_in_bank();
+
+            let actual_dir = bank
+                .get_direction(pin_in_bank)
+                .map_err(|_e| PinctrlError::InvalidConfig)?;
+
+            *dir = actual_dir;
+        }
+
+        Ok(PinConfig {
+            pin_id: pin,
+            function,
+            pull,
+            drive,
+        })
     }
 }
 

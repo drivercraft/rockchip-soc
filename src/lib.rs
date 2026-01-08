@@ -23,5 +23,9 @@ use core::ptr::NonNull;
 pub use variants::*;
 
 pub use pinctrl::id::*;
+pub use pinctrl::{DriveStrength, Function, PinctrlResult, Pull, GpioDirection};
 pub type Mmio = NonNull<u8>;
 pub use rst::{ResetRockchip, RstId};
+
+// 导出 RK3588 特定类型
+pub use variants::rk3588::PinManager;
