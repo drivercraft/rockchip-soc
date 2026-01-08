@@ -13,14 +13,15 @@ mod _macros;
 mod grf;
 
 mod clock;
+mod pinctrl;
 mod rst;
 mod syscon;
 mod variants;
-mod pinctrl;
 
 use core::ptr::NonNull;
 
 pub use variants::*;
 
+pub use pinctrl::id::*;
 pub type Mmio = NonNull<u8>;
 pub use rst::{ResetRockchip, RstId};
