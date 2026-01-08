@@ -8,6 +8,7 @@ dma-api = {version = "0.5", features = ["alloc"]}
 log = "0.4"
 mbarrier = "0.1"
 thiserror = {version = "2", default-features = false}
+tock-registers = "0.10"
 
 [target.'cfg(not(any(windows, unix)))'.dev-dependencies]
 bare-test = "0.7"

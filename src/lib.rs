@@ -7,12 +7,16 @@ extern crate alloc;
 extern crate log;
 
 #[macro_use]
+mod _macros;
+
+#[macro_use]
 mod grf;
 
 mod clock;
 mod rst;
 mod syscon;
 mod variants;
+mod pinctrl;
 
 use core::ptr::NonNull;
 

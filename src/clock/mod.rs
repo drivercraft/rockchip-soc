@@ -2,60 +2,13 @@ use core::ops::RangeBounds;
 
 pub mod pll;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct ClkId(u64);
-
-impl From<u64> for ClkId {
-    fn from(value: u64) -> Self {
-        ClkId(value)
-    }
-}
-
-impl From<usize> for ClkId {
-    fn from(value: usize) -> Self {
-        ClkId(value as u64)
-    }
-}
+def_id!(ClkId, u64);
 
 impl From<u32> for ClkId {
     fn from(value: u32) -> Self {
-        ClkId(value as u64)
+        Self(value as _)
     }
 }
-
-impl From<ClkId> for u64 {
-    fn from(clk_id: ClkId) -> Self {
-        clk_id.0
-    }
-}
-
-impl core::fmt::Display for ClkId {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "ClkId({})", self.0)
-    }
-}
-
-impl ClkId {
-    /// 获取时钟 ID 的数值表示
-    pub const fn value(&self) -> u64 {
-        self.0
-    }
-
-    pub const fn new(value: u64) -> Self {
-        ClkId(value)
-    }
-}
-
-impl RangeBounds<ClkId> for ClkId {
-    fn start_bound(&self) -> core::ops::Bound<&ClkId> {
-        core::ops::Bound::Included(self)
-    }
-
-    fn end_bound(&self) -> core::ops::Bound<&ClkId> {
-        core::ops::Bound::Included(self)
-    }
-}
-
 // =============================================================================
 // UART 时钟边界常量 (参考 rk3588-cru.h)
 // =============================================================================
