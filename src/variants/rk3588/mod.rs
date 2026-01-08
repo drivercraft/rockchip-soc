@@ -1,6 +1,7 @@
 pub mod cru;
 pub mod gpio;
 pub mod pinctrl;
+pub mod pinmanager;
 mod syscon;
 
 // =============================================================================
@@ -10,3 +11,4 @@ mod syscon;
 pub use cru::Cru;
 pub use gpio::GpioBank;
 pub use pinctrl::Pinctrl;
+pub use pinmanager::PinManager;
