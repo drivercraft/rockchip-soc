@@ -64,7 +64,7 @@ impl IocBase {
 ///
 /// 返回 `Some(IomuxConfig)` 如果引脚有效，否则返回 `None`
 pub fn calc_iomux_config(pin: PinId) -> Option<(IomuxConfig, Option<IomuxConfig>)> {
-    let bank = pin.bank().raw() as u32;
+    let bank = pin.bank().raw();
     let pin_in_bank = pin.pin_in_bank();
 
     // 每组 8 个引脚，每组 2 个寄存器（每个寄存器 4 个引脚）
@@ -78,7 +78,7 @@ pub fn calc_iomux_config(pin: PinId) -> Option<(IomuxConfig, Option<IomuxConfig>
     // GPIO0 (bank 0) 的特殊处理
     if bank == 0 {
         // GPIO0_PB4 (pin 12) 到 GPIO0_PD7 (pin 31) 需要双寄存器配置
-        if pin_in_bank >= 12 && pin_in_bank <= 31 {
+        if (12..=31).contains(&pin_in_bank) {
             let pmu2_offset = base_reg_offset + IocBase::Pmu2.offset();
             let bus_offset = base_reg_offset + IocBase::Bus.offset();
 

@@ -1,10 +1,9 @@
 use alloc::vec::Vec;
+use core::assert_eq;
 use core::ptr::NonNull;
 use num_align::NumAlign;
-use rockchip_soc::{
-    Pull,
-    rk3588::{PinManager, gpio::GpioDirection},
-};
+use rockchip_soc::rk3588::{PinConfig, PinManager};
+use rockchip_soc::{DriveStrength, Function, GpioDirection, Pull};
 
 use bare_test::{
     fdt_parser::Node,
@@ -22,179 +21,121 @@ pub fn test_pin() {
     let test_pin = rockchip_soc::GPIO3_B6;
     info!("Testing pin: {} (GPIO3_B6, blue_led)", test_pin.raw());
 
-    // 设备树配置验证
-    info!("=== Device Tree Configuration ===");
-    info!("Expected: GPIO3_B6 (Pin 110)");
-    info!("  - Bank: 3");
-    info!("  - Pin in Bank: 14 (0x06 + 8)");
-    info!("  - Function: GPIO");
-    info!("  - Pull: PullUp");
-    info!("  - Drive: Default");
+    // 验证引脚 ID
+    assert_eq!(test_pin.raw(), 110, "Pin ID should be 110");
+    assert_eq!(test_pin.bank().raw(), 3, "Bank ID should be 3");
+    assert_eq!(test_pin.pin_in_bank(), 14, "Pin in bank should be 14");
 
-    info!("=== Actual State ===");
-    info!("  - Pin ID: {}", test_pin.raw());
-    info!("  - Bank ID: {}", test_pin.bank().raw());
-    info!("  - Pin in Bank: {}", test_pin.pin_in_bank());
+    // 读取 u-boot 初始配置
+    info!("\n=== Reading u-boot Initial Configuration ===");
+    let config = pinctrl
+        .get_pin_config(test_pin)
+        .expect("Failed to get pin config");
 
-    // 使用 get_pin_config 获取完整配置
-    info!("\n=== Reading Pin Configuration via get_pin_config() ===");
-    match pinctrl.get_pin_config(test_pin) {
-        Ok(config) => {
-            info!("Pin ID: {}", config.pin_id.raw());
-            info!("Bank ID: {}", config.bank_id.raw());
-            info!("Pin in Bank: {}", config.pin_in_bank);
-            info!("Function: {:?}", config.function);
-            info!("Pull: {:?}", config.pull);
-            info!("Drive: {:?}", config.drive);
+    info!("Pin ID: {}", config.pin_id.raw());
+    info!("Bank ID: {}", config.pin_id.bank().raw());
+    info!("Pin in Bank: {}", config.pin_id.pin_in_bank());
+    info!("Function: {:?}", config.function);
+    info!("Pull: {:?}", config.pull);
+    info!("Drive: {:?}", config.drive);
 
-            match config.gpio_direction {
-                Some(GpioDirection::Input) => {
-                    info!("GPIO Direction: Input");
-                }
-                Some(GpioDirection::Output(value)) => {
-                    info!("GPIO Direction: Output (value: {})", value);
-                }
-                None => {
-                    info!("GPIO Direction: Unknown");
-                }
-            }
+    // 验证 Function 是否为 GPIO
+    assert!(
+        matches!(config.function, Function::Gpio(_)),
+        "Function should be GPIO, got {:?}",
+        config.function
+    );
 
-            if let Some(level) = config.gpio_level {
-                info!("GPIO Actual Level: {}", level);
-            }
-        }
-        Err(e) => {
-            warn!("Failed to get pin config: {:?}", e);
-        }
+    // 从 Function 中提取并验证 GPIO 方向
+    if let Function::Gpio(direction) = config.function {
+        info!("GPIO Direction: {:?}", direction);
     }
 
-    // 读取初始状态（兼容性测试）
-    info!("\n=== Legacy API Test ===");
-    let bank = pinctrl.gpio_bank(test_pin.bank()).unwrap();
-    let pin_in_bank = test_pin.pin_in_bank();
-
-    // 读取方向配置（同时获取输出值）
-    match bank.get_direction(pin_in_bank) {
-        Ok(GpioDirection::Input) => {
-            info!("Initial direction: Input");
-        }
-        Ok(GpioDirection::Output(value)) => {
-            info!("Initial direction: Output (current value: {})", value);
-        }
-        Err(e) => {
-            warn!("Failed to get direction: {:?}", e);
-        }
-    }
-
-    // 读取引脚实际电平值
-    match bank.read(pin_in_bank) {
-        Ok(value) => {
-            info!("Pin actual level: {}", value);
-        }
-        Err(e) => {
-            warn!("Failed to read pin: {:?}", e);
-        }
-    }
+    // 读取并显示引脚实际电平值
+    let level = pinctrl
+        .read_gpio(test_pin)
+        .expect("Failed to read GPIO level");
+    info!("GPIO Actual Level: {}", level);
 
     // 测试输出配置
     info!("\n=== Testing Output Configuration ===");
-    if let Err(e) = pinctrl.config_gpio_output(test_pin, Pull::PullUp, false) {
-        warn!("Failed to config as output: {:?}", e);
-    } else {
-        info!("✓ Configured as output (initial LOW)");
+    pinctrl
+        .config_peripheral(PinConfig {
+            pin_id: test_pin,
+            function: Function::Gpio(GpioDirection::Output(false)),
+            pull: Pull::PullUp,
+            drive: DriveStrength::Ma8,
+        })
+        .expect("Failed to config as output");
+    info!("✓ Configured as output (initial LOW)");
 
-        // 写入 HIGH
-        if let Err(e) = pinctrl.write_gpio(test_pin, true) {
-            warn!("Failed to write HIGH: {:?}", e);
-        } else {
-            info!("✓ Wrote HIGH (LED should be ON)");
-        }
+    // 写入 HIGH
+    pinctrl
+        .write_gpio(test_pin, true)
+        .expect("Failed to write HIGH");
+    info!("✓ Wrote HIGH (LED should be ON)");
 
-        // 读取验证
-        match pinctrl.read_gpio(test_pin) {
-            Ok(value) => {
-                info!("✓ Read back value: {} (expected: true)", value);
-            }
-            Err(e) => {
-                warn!("Failed to read: {:?}", e);
-            }
-        }
+    // 读取验证
+    let value = pinctrl.read_gpio(test_pin).expect("Failed to read");
+    assert_eq!(value, true, "Read value should be true after writing HIGH");
+    info!("✓ Read back value: true (correct)");
 
-        // 写入 LOW
-        if let Err(e) = pinctrl.write_gpio(test_pin, false) {
-            warn!("Failed to write LOW: {:?}", e);
-        } else {
-            info!("✓ Wrote LOW (LED should be OFF)");
-        }
-    }
+    // 写入 LOW
+    pinctrl
+        .write_gpio(test_pin, false)
+        .expect("Failed to write LOW");
+    info!("✓ Wrote LOW (LED should be OFF)");
 
     // 测试输入配置
     info!("\n=== Testing Input Configuration ===");
-    if let Err(e) = pinctrl.config_gpio_input(test_pin, Pull::PullUp) {
-        warn!("Failed to config as input: {:?}", e);
+    pinctrl
+        .config_peripheral(PinConfig {
+            pin_id: test_pin,
+            function: Function::Gpio(GpioDirection::Input),
+            pull: Pull::PullUp,
+            drive: DriveStrength::Ma8,
+        })
+        .expect("Failed to config as input");
+    info!("✓ Configured as input with PullUp");
+
+    // 使用 get_pin_config 验证输入配置
+    let config = pinctrl
+        .get_pin_config(test_pin)
+        .expect("Failed to get pin config");
+    assert!(
+        matches!(config.function, Function::Gpio(GpioDirection::Input)),
+        "Function should be GPIO Input, got {:?}",
+        config.function
+    );
+    info!("✓ get_pin_config confirmed: Input (correct)");
+
+    // 测试统一接口 - 配置为输出
+    info!("\n=== Testing Unified Interface - Output ===");
+    pinctrl
+        .config_peripheral(PinConfig {
+            pin_id: test_pin,
+            function: Function::Gpio(GpioDirection::Output(false)),
+            pull: Pull::PullUp,
+            drive: DriveStrength::Ma8,
+        })
+        .expect("Failed to config as output");
+    info!("✓ Configured as output using PinConfig (initial LOW)");
+
+    // 验证配置
+    let config = pinctrl
+        .get_pin_config(test_pin)
+        .expect("Failed to get pin config");
+    if let Function::Gpio(GpioDirection::Output(value)) = config.function {
+        assert_eq!(value, false, "Output initial value should be false");
+        info!("✓ get_pin_config confirmed: Output(false) (correct)");
     } else {
-        info!("✓ Configured as input with PullUp");
+        panic!("Unexpected function: {:?}", config.function);
     }
 
-    // 测试统一接口（使用 DirectionConfig）
-    info!("\n=== Testing Unified Interface (DirectionConfig) ===");
-
-    // 使用统一接口配置为输出
-    if let Err(e) = pinctrl.config_gpio(test_pin, Pull::PullUp, GpioDirection::Output(false)) {
-        warn!("Failed to config as output (unified): {:?}", e);
-    } else {
-        info!("✓ Configured as output using DirectionConfig (initial LOW)");
-
-        // 验证方向配置（同时读取输出值）
-        let bank = pinctrl.gpio_bank(test_pin.bank()).unwrap();
-        let pin_in_bank = test_pin.pin_in_bank();
-        match bank.get_direction(pin_in_bank) {
-            Ok(GpioDirection::Output(value)) => {
-                info!(
-                    "✓ get_direction returned: Output({}) (expected: false)",
-                    value
-                );
-            }
-            Ok(GpioDirection::Input) => {
-                warn!("✗ Unexpected: get_direction returned Input");
-            }
-            Err(e) => {
-                warn!("Failed to get direction: {:?}", e);
-            }
-        }
-
-        // 验证实际电平
-        match pinctrl.read_gpio(test_pin) {
-            Ok(value) => {
-                info!("✓ Read actual level: {} (expected: false)", value);
-            }
-            Err(e) => {
-                warn!("Failed to read: {:?}", e);
-            }
-        }
-    }
-
-    // 使用统一接口配置为输入
-    if let Err(e) = pinctrl.config_gpio(test_pin, Pull::PullUp, GpioDirection::Input) {
-        warn!("Failed to config as input (unified): {:?}", e);
-    } else {
-        info!("✓ Configured as input using DirectionConfig");
-
-        // 验证方向配置
-        let bank = pinctrl.gpio_bank(test_pin.bank()).unwrap();
-        let pin_in_bank = test_pin.pin_in_bank();
-        match bank.get_direction(pin_in_bank) {
-            Ok(GpioDirection::Input) => {
-                info!("✓ get_direction returned: Input (correct)");
-            }
-            Ok(GpioDirection::Output(_)) => {
-                warn!("✗ Unexpected: get_direction returned Output");
-            }
-            Err(e) => {
-                warn!("Failed to get direction: {:?}", e);
-            }
-        }
-    }
+    // 验证实际电平
+    let level = pinctrl.read_gpio(test_pin).expect("Failed to read");
+    assert_eq!(level, false, "Actual level should be false");
+    info!("✓ Read actual level: false (correct)");
 
     info!("\n=== Test Complete ===");
 }

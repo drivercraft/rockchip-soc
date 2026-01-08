@@ -23,7 +23,7 @@ use core::ptr::NonNull;
 pub use variants::*;
 
 pub use pinctrl::id::*;
-pub use pinctrl::{DriveStrength, Function, PinctrlResult, Pull, GpioDirection};
+pub use pinctrl::{DriveStrength, Function, GpioDirection, PinctrlResult, Pull};
 pub type Mmio = NonNull<u8>;
 pub use rst::{ResetRockchip, RstId};
 
