@@ -2,6 +2,10 @@
 //!
 //! 定义引脚电气属性配置，包括上下拉、驱动强度等。
 
+use core::ptr::NonNull;
+
+use crate::{PinId, pinctrl::pinmux::Iomux};
+
 /// 引脚上下拉配置
 ///
 /// 定义引脚的上下拉电阻配置。
@@ -17,105 +21,73 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
 pub enum Pull {
-    /// 禁用上下拉
     Disabled = 0,
-
-    /// 上拉
-    PullUp = 1,
-
-    /// 下拉
-    PullDown = 2,
+    BusHold = 2,
+    PullUp = 3,
+    PullDown = 4,
+    PullPinDefault = 5,
 }
 
-/// 驱动强度配置（mA）
-///
-/// 定义引脚输出驱动强度，单位为毫安。
-///
-/// # 示例
-///
-/// ```
-/// use rockchip_soc::pinctrl::DriveStrength;
-///
-/// // 配置为 8mA 驱动强度
-/// let drive = DriveStrength::Ma8;
-/// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(u32)]
-pub enum DriveStrength {
-    /// 2 mA
-    Ma2 = 0,
-
-    /// 4 mA
-    Ma4 = 1,
-
-    /// 8 mA
-    Ma8 = 2,
-
-    /// 12 mA
-    Ma12 = 3,
-}
-
-/// 完整的引脚配置
-///
-/// 组合了引脚功能、上下拉和驱动强度的完整配置。
-///
-/// # 示例
-///
-/// ```
-/// use rockchip_soc::pinctrl::{PinConfig, Function, Pull, DriveStrength};
-///
-/// // 创建基础配置
-/// let config = PinConfig::new(Function::Alt1);
-///
-/// // 使用 builder 模式添加配置
-/// let config = PinConfig::new(Function::Alt1)
-///     .with_pull(Pull::PullUp)
-///     .with_drive(DriveStrength::Ma8);
-/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PinConfig {
+    pub id: PinId,
     /// 引脚功能
-    pub function: super::Function,
-
-    /// 可选的上下拉配置
-    pub pull: Option<Pull>,
-
+    pub mux: Iomux,
+    pub pull: Pull,
     /// 可选的驱动强度配置
-    pub drive: Option<DriveStrength>,
+    pub drive: Option<u32>,
 }
 
 impl PinConfig {
-    /// 创建新的引脚配置
-    ///
-    /// # 参数
-    ///
-    /// * `function` - 引脚功能
-    pub const fn new(function: super::Function) -> Self {
-        Self {
-            function,
-            pull: None,
-            drive: None,
+    /// `rockchip,pins` property
+    pub fn new_with_fdt(cells: &[u32], fdt_addr: NonNull<u8>) -> Self {
+        let bank = cells[0];
+        let pin = cells[1];
+        let mux = cells[2];
+        let conf_phandle = cells[3];
+        let id = PinId::from_bank_pin(bank.into(), pin).unwrap();
+
+        let fdt = unsafe { fdt_edit::Fdt::from_ptr(fdt_addr.as_ptr()).unwrap() };
+
+        let conf_node = fdt.find_by_phandle(conf_phandle.into()).unwrap();
+
+        let mut pull = Pull::Disabled;
+        let mut drive = None;
+
+        for prop in conf_node.properties() {
+            match prop.name() {
+                "bias-disable" => {
+                    pull = Pull::Disabled;
+                }
+                "bias-bus-hold" => {
+                    pull = Pull::BusHold;
+                }
+                "bias-pull-up" => {
+                    pull = Pull::PullUp;
+                }
+                "bias-pull-down" => {
+                    pull = Pull::PullDown;
+                }
+                "bias-pull-pin-default" => {
+                    pull = Pull::PullPinDefault;
+                }
+                "drive-strength" => {
+                    let value = prop.get_u32().unwrap_or(1);
+                    drive = Some(value);
+                }
+                "phandle" => {}
+                n => {
+                    warn!("Unknown pinconf property: {}", n);
+                }
+            }
         }
-    }
 
-    /// 设置上下拉配置
-    ///
-    /// # 参数
-    ///
-    /// * `pull` - 上下拉配置
-    pub const fn with_pull(mut self, pull: Pull) -> Self {
-        self.pull = Some(pull);
-        self
-    }
-
-    /// 设置驱动强度配置
-    ///
-    /// # 参数
-    ///
-    /// * `drive` - 驱动强度配置
-    pub const fn with_drive(mut self, drive: DriveStrength) -> Self {
-        self.drive = Some(drive);
-        self
+        Self {
+            id,
+            pull,
+            drive,
+            mux: Iomux::from_bits_truncate(mux as _),
+        }
     }
 }
 

@@ -4,12 +4,14 @@
 
 use core::fmt;
 
+mod fdt;
 pub mod id;
 mod pinconf;
-mod pinmux;
+pub mod pinmux;
 
+use alloc::vec::Vec;
 pub use id::{BankId, PinId};
-pub use pinconf::{DriveStrength, PinConfig, Pull};
+pub use pinconf::{PinConfig, Pull};
 pub use pinmux::Function;
 
 // 重新导出所有 GPIO 常量
@@ -26,21 +28,24 @@ pub enum GpioDirection {
 #[derive(Debug)]
 pub enum PinctrlError {
     /// 无效的引脚 ID
-    InvalidPinId(u32),
+    InvalidPinId(PinId),
 
     /// 引脚不支持该功能
     InvalidFunction,
 
     /// 无效的引脚配置
     InvalidConfig,
+
+    Unsupported,
 }
 
 impl fmt::Display for PinctrlError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::InvalidPinId(id) => write!(f, "无效的引脚 ID: {}", id),
+            Self::InvalidPinId(id) => write!(f, "无效的引脚 ID: {:?}", id),
             Self::InvalidFunction => write!(f, "引脚不支持该功能"),
             Self::InvalidConfig => write!(f, "无效的引脚配置"),
+            Self::Unsupported => write!(f, "不支持的操作"),
         }
     }
 }

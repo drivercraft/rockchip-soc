@@ -101,6 +101,12 @@ impl BankId {
     }
 }
 
+impl From<u32> for BankId {
+    fn from(id: u32) -> Self {
+        Self(id)
+    }
+}
+
 pub const GPIO0_A0: PinId = PinId(0);
 pub const GPIO0_A1: PinId = PinId(1);
 pub const GPIO0_A2: PinId = PinId(2);
