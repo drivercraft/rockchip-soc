@@ -11,4 +11,4 @@ mod syscon;
 pub use cru::Cru;
 pub use gpio::GpioBank;
 pub use pinctrl::Pinctrl;
-pub use pinmanager::{PinConfig, PinManager};
+pub use pinmanager::PinManager;
