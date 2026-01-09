@@ -4,7 +4,7 @@
 
 use crate::{
     Mmio, PinId,
-    pinctrl::{DriveStrength, Function, PinConfig, PinctrlError, PinctrlResult, Pull},
+    pinctrl::{Function, PinctrlError, PinctrlResult, Pull, pinmux::Iomux},
 };
 use core::ptr::NonNull;
 
@@ -48,6 +48,48 @@ impl Pinctrl {
         Self { ioc_base }
     }
 
+    // /// 设置引脚功能（pinmux）
+    // ///
+    // /// 配置引脚的复用功能（GPIO、UART、SPI 等）。
+    // ///
+    // /// # 参数
+    // ///
+    // /// * `pin` - 引脚 ID
+    // /// * `function` - 引脚功能
+    // ///
+    // /// # 参考
+    // ///
+    // /// u-boot: `drivers/pinctrl/rockchip/pinctrl-rk3588.c:rk3588_set_mux()`
+    // pub fn set_mux(&self, pin: PinId, function: Function) -> PinctrlResult<()> {
+    //     use crate::variants::rk3588::pinctrl::iomux::calc_iomux_config;
+
+    //     let (config, extra_config) =
+    //         calc_iomux_config(pin).ok_or(PinctrlError::InvalidPinId(pin.raw()))?;
+
+    //     // Rockchip 写掩码机制：高16位清除，低16位设置
+    //     // 每个引脚占 4 位，掩码为 0xf
+    //     let mask = 0xfu32 << config.bit_offset;
+    //     let value = function.num() << config.bit_offset;
+
+    //     unsafe {
+    //         let reg_ptr = self.ioc_base.as_ptr().add(config.reg_offset) as *mut u32;
+    //         reg_ptr.write_volatile((mask << 16) | value);
+    //     }
+
+    //     // 如果需要双寄存器配置（GPIO0 的某些引脚）
+    //     if let Some(extra) = extra_config {
+    //         let mask = 0xfu32 << extra.bit_offset;
+    //         let value = function.num() << extra.bit_offset;
+
+    //         unsafe {
+    //             let reg_ptr = self.ioc_base.as_ptr().add(extra.reg_offset) as *mut u32;
+    //             reg_ptr.write_volatile((mask << 16) | value);
+    //         }
+    //     }
+
+    //     Ok(())
+    // }
+
     /// 设置引脚功能（pinmux）
     ///
     /// 配置引脚的复用功能（GPIO、UART、SPI 等）。
@@ -60,16 +102,17 @@ impl Pinctrl {
     /// # 参考
     ///
     /// u-boot: `drivers/pinctrl/rockchip/pinctrl-rk3588.c:rk3588_set_mux()`
-    pub fn set_mux(&self, pin: PinId, function: Function) -> PinctrlResult<()> {
+    pub fn set_mux(&self, pin: PinId, mux: Iomux) -> PinctrlResult<()> {
+        let mux = mux.bits() as u32;
         use crate::variants::rk3588::pinctrl::iomux::calc_iomux_config;
 
         let (config, extra_config) =
-            calc_iomux_config(pin).ok_or(PinctrlError::InvalidPinId(pin.raw()))?;
+            calc_iomux_config(pin).ok_or(PinctrlError::InvalidPinId(pin))?;
 
         // Rockchip 写掩码机制：高16位清除，低16位设置
         // 每个引脚占 4 位，掩码为 0xf
         let mask = 0xfu32 << config.bit_offset;
-        let value = function.num() << config.bit_offset;
+        let value = mux << config.bit_offset;
 
         unsafe {
             let reg_ptr = self.ioc_base.as_ptr().add(config.reg_offset) as *mut u32;
@@ -79,7 +122,7 @@ impl Pinctrl {
         // 如果需要双寄存器配置（GPIO0 的某些引脚）
         if let Some(extra) = extra_config {
             let mask = 0xfu32 << extra.bit_offset;
-            let value = function.num() << extra.bit_offset;
+            let value = mux << extra.bit_offset;
 
             unsafe {
                 let reg_ptr = self.ioc_base.as_ptr().add(extra.reg_offset) as *mut u32;
@@ -106,7 +149,7 @@ impl Pinctrl {
         use crate::variants::rk3588::pinctrl::pinconf_regs::find_pull_entry;
 
         let (reg_offset, bit_offset) =
-            find_pull_entry(pin).ok_or(PinctrlError::InvalidPinId(pin.raw()))?;
+            find_pull_entry(pin).ok_or(PinctrlError::InvalidPinId(pin))?;
 
         // Rockchip 写掩码机制
         // 每个 pull 配置占 2 位，掩码为 0x3
@@ -133,11 +176,11 @@ impl Pinctrl {
     /// # 参考
     ///
     /// u-boot: `drivers/pinctrl/rockchip/pinctrl-rk3588.c:rk3588_set_drive()`
-    pub fn set_drive(&self, pin: PinId, drive: DriveStrength) -> PinctrlResult<()> {
+    pub fn set_drive(&self, pin: PinId, drive: u32) -> PinctrlResult<()> {
         use crate::variants::rk3588::pinctrl::pinconf_regs::find_drive_entry;
 
         let (reg_offset, bit_offset) =
-            find_drive_entry(pin).ok_or(PinctrlError::InvalidPinId(pin.raw()))?;
+            find_drive_entry(pin).ok_or(PinctrlError::InvalidPinId(pin))?;
 
         // Rockchip 写掩码机制
         // 每个 drive 配置占 8 位（但实际只使用低 2 位）
@@ -163,11 +206,11 @@ impl Pinctrl {
     /// # 返回
     ///
     /// 返回引脚当前的功能配置
-    pub fn get_mux(&self, pin: PinId) -> PinctrlResult<Function> {
+    pub fn get_mux(&self, pin: PinId) -> PinctrlResult<Iomux> {
         use crate::variants::rk3588::pinctrl::iomux::calc_iomux_config;
 
         let (config, _extra_config) =
-            calc_iomux_config(pin).ok_or(PinctrlError::InvalidPinId(pin.raw()))?;
+            calc_iomux_config(pin).ok_or(PinctrlError::InvalidPinId(pin))?;
 
         // 读取寄存器值
         let reg_value = unsafe {
@@ -175,7 +218,7 @@ impl Pinctrl {
             reg_ptr.read_volatile()
         };
 
-        log::info!(
+        debug!(
             "get_mux: pin={}, reg_offset={:#x}, bit_offset={}, reg_value={:#x}",
             pin.raw(),
             config.reg_offset,
@@ -187,10 +230,10 @@ impl Pinctrl {
         let mask = 0xfu32 << config.bit_offset;
         let func_num = (reg_value & mask) >> config.bit_offset;
 
-        log::info!("get_mux: func_num={}, mask={:#x}", func_num, mask);
+        debug!("get_mux: func_num={}, mask={:#x}", func_num, mask);
 
         // 转换为 Function 枚举
-        Function::from_num(func_num).ok_or(PinctrlError::InvalidConfig)
+        Iomux::from_bits(func_num as u8).ok_or(PinctrlError::InvalidConfig)
     }
 
     /// 读取 pull 配置
@@ -208,7 +251,7 @@ impl Pinctrl {
         use crate::variants::rk3588::pinctrl::pinconf_regs::find_pull_entry;
 
         let (reg_offset, bit_offset) =
-            find_pull_entry(pin).ok_or(PinctrlError::InvalidPinId(pin.raw()))?;
+            find_pull_entry(pin).ok_or(PinctrlError::InvalidPinId(pin))?;
 
         // 读取寄存器值
         let reg_value = unsafe {
@@ -253,11 +296,11 @@ impl Pinctrl {
     /// # 返回
     ///
     /// 返回引脚当前的驱动强度配置
-    pub fn get_drive(&self, pin: PinId) -> PinctrlResult<DriveStrength> {
+    pub fn get_drive(&self, pin: PinId) -> PinctrlResult<u32> {
         use crate::variants::rk3588::pinctrl::pinconf_regs::find_drive_entry;
 
         let (reg_offset, bit_offset) =
-            find_drive_entry(pin).ok_or(PinctrlError::InvalidPinId(pin.raw()))?;
+            find_drive_entry(pin).ok_or(PinctrlError::InvalidPinId(pin))?;
 
         // 读取寄存器值
         let reg_value = unsafe {
@@ -265,7 +308,7 @@ impl Pinctrl {
             reg_ptr.read_volatile()
         };
 
-        log::info!(
+        debug!(
             "get_drive: pin={}, reg_offset={:#x}, bit_offset={}, reg_value={:#x}",
             pin.raw(),
             reg_offset,
@@ -277,18 +320,8 @@ impl Pinctrl {
         let mask = 0x3u32 << bit_offset;
         let drive_value = (reg_value & mask) >> bit_offset;
 
-        log::info!("get_drive: drive_value={}, mask={:#x}", drive_value, mask);
+        debug!("get_drive: drive_value={}, mask={:#x}", drive_value, mask);
 
-        // 转换为 DriveStrength 枚举
-        match drive_value {
-            0 => Ok(DriveStrength::Ma2),
-            1 => Ok(DriveStrength::Ma4),
-            2 => Ok(DriveStrength::Ma8),
-            3 => Ok(DriveStrength::Ma12),
-            _ => {
-                log::warn!("Invalid drive value {} for pin {}", drive_value, pin.raw());
-                Err(PinctrlError::InvalidConfig)
-            }
-        }
+        Ok(drive_value)
     }
 }

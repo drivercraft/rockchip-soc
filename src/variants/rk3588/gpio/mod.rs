@@ -1,50 +1,47 @@
-pub mod consts;
-
-use consts::*;
-
-use crate::{GpioDirection, Mmio};
+use crate::{
+    GpioDirection, Mmio, PinId, PinctrlResult, pinctrl::PinctrlError, pinctrl::pinmux::Iomux,
+};
 
 mod reg;
 
-use core::fmt;
 use reg::*;
 use tock_registers::interfaces::{Readable, Writeable};
 
-/// GPIO 错误类型
-#[derive(Debug)]
-pub enum GpioError {
-    /// 无效的引脚编号（必须 < 32）
-    InvalidPin(u32),
-
-    /// 尝试写入未配置为输出的引脚
-    NotConfiguredAsOutput,
-}
-
-impl fmt::Display for GpioError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Self::InvalidPin(pin) => write!(f, "无效的 GPIO 引脚编号: {} (必须 < 32)", pin),
-            Self::NotConfiguredAsOutput => write!(f, "引脚未配置为输出方向"),
-        }
-    }
-}
-
-/// GPIO 操作 Result 类型
-pub type GpioResult<T> = core::result::Result<T, GpioError>;
-
 pub struct GpioBank {
     base: usize,
+    iomux: [Iomux; 4],
 }
 
 impl GpioBank {
-    pub fn new(base: Mmio) -> Self {
+    pub fn new(base: Mmio, iomux: [Iomux; 4]) -> Self {
         GpioBank {
             base: base.as_ptr() as usize,
+            iomux,
         }
     }
 
     fn reg(&self) -> &Registers {
         unsafe { &*(self.base as *const Registers) }
+    }
+
+    pub fn verify_mux(&self, pin: PinId, mux: Iomux) -> PinctrlResult<()> {
+        let pin_in_bank = pin.pin_in_bank();
+        if pin_in_bank >= 32 {
+            return Err(PinctrlError::InvalidPinId(pin));
+        }
+        let iomux_num = pin_in_bank / 8;
+
+        if self.iomux[iomux_num as usize].contains(Iomux::UNROUTED) {
+            debug!("verify_mux: pin {:?} does not support routing", pin);
+            return Err(PinctrlError::Unsupported);
+        }
+
+        if self.iomux[iomux_num as usize].contains(Iomux::GPIO_ONLY) && mux != Iomux::GPIO_ONLY {
+            debug!("verify_mux: pin {:?} only supports GPIO function", pin);
+            return Err(PinctrlError::Unsupported);
+        }
+
+        Ok(())
     }
 
     /// 设置引脚方向（统一接口）
@@ -60,10 +57,10 @@ impl GpioBank {
     /// bank.set_direction(5, DirectionConfig::Input)?;
     /// bank.set_direction(5, DirectionConfig::Output(true))?;  // 输出，初始值 HIGH
     /// ```
-    pub fn set_direction(&self, pin_in_bank: u32, direction: GpioDirection) -> GpioResult<()> {
+    pub fn set_direction(&self, pin: PinId, direction: GpioDirection) -> PinctrlResult<()> {
         match direction {
-            GpioDirection::Input => self.set_direction_input(pin_in_bank),
-            GpioDirection::Output(value) => self.set_direction_output(pin_in_bank, value),
+            GpioDirection::Input => self.set_direction_input(pin),
+            GpioDirection::Output(value) => self.set_direction_output(pin, value),
         }
     }
 
@@ -73,11 +70,8 @@ impl GpioBank {
     ///
     /// * `pin_in_bank` - Bank 内的引脚编号 (0-31)
     #[inline]
-    pub fn set_direction_input(&self, pin_in_bank: u32) -> GpioResult<()> {
-        if pin_in_bank >= 32 {
-            return Err(GpioError::InvalidPin(pin_in_bank));
-        }
-
+    pub fn set_direction_input(&self, pin: PinId) -> PinctrlResult<()> {
+        let pin_in_bank = pin.pin_in_bank();
         let mask = 1u32 << pin_in_bank;
         let current = self.reg().swport_ddr.get();
         self.reg().swport_ddr.set(current & !mask);
@@ -92,9 +86,10 @@ impl GpioBank {
     /// * `pin_in_bank` - Bank 内的引脚编号 (0-31)
     /// * `value` - 初始输出值
     #[inline]
-    pub fn set_direction_output(&self, pin_in_bank: u32, value: bool) -> GpioResult<()> {
+    pub fn set_direction_output(&self, pin: PinId, value: bool) -> PinctrlResult<()> {
+        let pin_in_bank = pin.pin_in_bank();
         if pin_in_bank >= 32 {
-            return Err(GpioError::InvalidPin(pin_in_bank));
+            return Err(PinctrlError::InvalidPinId(pin));
         }
 
         let mask = 1u32 << pin_in_bank;
@@ -120,9 +115,10 @@ impl GpioBank {
     /// # 参数
     ///
     /// * `pin_in_bank` - Bank 内的引脚编号 (0-31)
-    pub fn read(&self, pin_in_bank: u32) -> GpioResult<bool> {
+    pub fn read(&self, pin: PinId) -> PinctrlResult<bool> {
+        let pin_in_bank = pin.pin_in_bank();
         if pin_in_bank >= 32 {
-            return Err(GpioError::InvalidPin(pin_in_bank));
+            return Err(PinctrlError::InvalidPinId(pin));
         }
 
         let mask = 1u32 << pin_in_bank;
@@ -138,9 +134,10 @@ impl GpioBank {
     ///
     /// * `pin_in_bank` - Bank 内的引脚编号 (0-31)
     /// * `value` - 输出值
-    pub fn write(&self, pin_in_bank: u32, value: bool) -> GpioResult<()> {
+    pub fn write(&self, pin: PinId, value: bool) -> PinctrlResult<()> {
+        let pin_in_bank = pin.pin_in_bank();
         if pin_in_bank >= 32 {
-            return Err(GpioError::InvalidPin(pin_in_bank));
+            return Err(PinctrlError::InvalidPinId(pin));
         }
 
         let mask = 1u32 << pin_in_bank;
@@ -168,9 +165,10 @@ impl GpioBank {
     /// 返回 `DirectionConfig`：
     /// - `Input` - 引脚配置为输入
     /// - `Output(value)` - 引脚配置为输出，value 为当前输出值
-    pub fn get_direction(&self, pin_in_bank: u32) -> GpioResult<GpioDirection> {
+    pub fn get_direction(&self, pin: PinId) -> PinctrlResult<GpioDirection> {
+        let pin_in_bank = pin.pin_in_bank();
         if pin_in_bank >= 32 {
-            return Err(GpioError::InvalidPin(pin_in_bank));
+            return Err(PinctrlError::InvalidPinId(pin));
         }
 
         let mask = 1u32 << pin_in_bank;
