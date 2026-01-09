@@ -48,22 +48,16 @@ impl PinManager {
     /// - GPIO0-4: 0xfd8a0000, 0xfec20000, 0xfec30000, 0xfec40000, 0xfec50000
     pub fn new(ioc: Mmio, gpio: [Mmio; 5]) -> Self {
         let iomux = [Iomux::WIDTH_4BIT; 4];
-        let mut s = Self {
+        Self {
             pinctrl: unsafe { Pinctrl::new(ioc) },
             gpio_banks: [
-                GpioBank::new(gpio[0], iomux), // GPIO0 (Pin 0-31)
-                GpioBank::new(gpio[1], iomux), // GPIO1 (Pin 32-63)
-                GpioBank::new(gpio[2], iomux), // GPIO2 (Pin 64-95)
-                GpioBank::new(gpio[3], iomux), // GPIO3 (Pin 96-127)
-                GpioBank::new(gpio[4], iomux), // GPIO4 (Pin 128-159)
+                GpioBank::new(gpio[0], 0, iomux), // GPIO0 (Pin 0-31) - PMU1_IOC
+                GpioBank::new(gpio[1], 1, iomux), // GPIO1 (Pin 32-63) - BUS_IOC
+                GpioBank::new(gpio[2], 2, iomux), // GPIO2 (Pin 64-95) - BUS_IOC
+                GpioBank::new(gpio[3], 3, iomux), // GPIO3 (Pin 96-127) - BUS_IOC
+                GpioBank::new(gpio[4], 4, iomux), // GPIO4 (Pin 128-159) - BUS_IOC
             ],
-        };
-        s.init();
-        s
-    }
-
-    fn init(&mut self) {
-
+        }
     }
 
     /// 读取 GPIO 引脚值
@@ -105,7 +99,9 @@ impl PinManager {
             return Ok(());
         }
 
-        self.pinctrl.set_mux(config.id, config.mux)?;
+        let iomux_reg = self.bank(config.id).iomux[config.id.pin_in_bank() as usize / 8];
+
+        self.pinctrl.set_mux(config.id, config.mux, iomux_reg)?;
 
         Ok(())
     }
@@ -276,9 +272,14 @@ mod tests {
     #[test]
     fn test_pin_manager_size() {
         // 验证 PinManager 大小合理
+        // PinManager 包含：
+        // - pinctrl: Pinctrl (1 个 usize)
+        // - gpio_banks: [GpioBank; 5] (每个 GpioBank = 1 usize + 4 * IomuxReg)
+        // - IomuxReg = Iomux(u8) + offset(usize) = 16 字节（对齐后）
+        // 总计：1 + 5 * (1 + 4 * 2) = 46 个 usize
         assert_eq!(
             core::mem::size_of::<PinManager>(),
-            6 * core::mem::size_of::<usize>()
+            46 * core::mem::size_of::<usize>()
         );
     }
 

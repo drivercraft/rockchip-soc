@@ -6,6 +6,7 @@ use core::ptr::NonNull;
 use crate::{
     Mmio, PinId,
     pinctrl::{Iomux, PinctrlError, PinctrlResult, Pull},
+    rk3588::{gpio::IomuxReg, pinctrl::iomux::IocBase},
 };
 
 mod iomux;
@@ -86,32 +87,67 @@ impl Pinctrl {
     /// # 参考
     ///
     /// u-boot: `drivers/pinctrl/rockchip/pinctrl-rk3588.c:rk3588_set_mux()`
-    pub fn set_mux(&self, pin: PinId, mux: Iomux) -> PinctrlResult<()> {
+    pub(crate) fn set_mux(&self, id: PinId, mux: Iomux, reg: IomuxReg) -> PinctrlResult<()> {
         let mux = mux.bits() as u32;
-        use crate::variants::rk3588::pinctrl::iomux::calc_iomux_config;
+        let pin = id.pin_in_bank();
+        let mut reg = reg.offset;
+        let mut data;
 
-        let (config, extra_config) =
-            calc_iomux_config(pin).ok_or(PinctrlError::InvalidPinId(pin))?;
-
-        // Rockchip 写掩码机制：高16位清除，低16位设置
-        // 每个引脚占 4 位，掩码为 0xf
-        let mask = 0xfu32 << config.bit_offset;
-        let value = mux << config.bit_offset;
-
-        unsafe {
-            let reg_ptr = self.ioc_base.as_ptr().add(config.reg_offset) as *mut u32;
-            reg_ptr.write_volatile((mask << 16) | value);
+        if pin % 8 >= 4 {
+            reg += 0x4; // 每组寄存器占用 8 字节，后4个引脚在高4字节
         }
 
-        // 如果需要双寄存器配置（GPIO0 的某些引脚）
-        if let Some(extra) = extra_config {
-            let mask = 0xfu32 << extra.bit_offset;
-            let value = mux << extra.bit_offset;
+        let bit = (pin % 4) * 4;
+        let mask = 0xfu32;
 
-            unsafe {
-                let reg_ptr = self.ioc_base.as_ptr().add(extra.reg_offset) as *mut u32;
-                reg_ptr.write_volatile((mask << 16) | value);
+        if id.bank().raw() == 0 {
+            if (12..=31).contains(&pin) {
+                if mux < 8 {
+                    let reg0 = reg + IocBase::Pmu2.offset() - 0xC;
+                    data = mask << (bit + 16);
+                    data |= mux << bit;
+
+                    unsafe {
+                        let reg_ptr = self.ioc_base.as_ptr().add(reg0) as *mut u32;
+                        reg_ptr.write_volatile(data);
+                    }
+                } else {
+                    let reg0 = reg + IocBase::Pmu2.offset() - 0xC;
+                    data = mask << (bit + 16);
+                    data |= 8 << bit;
+                    unsafe {
+                        let reg_ptr = self.ioc_base.as_ptr().add(reg0) as *mut u32;
+                        reg_ptr.write_volatile(data);
+                    }
+
+                    let reg1 = reg + IocBase::Bus.offset();
+                    data = mask << (bit + 16);
+                    data |= mux << bit;
+                    unsafe {
+                        let reg_ptr = self.ioc_base.as_ptr().add(reg1) as *mut u32;
+                        reg_ptr.write_volatile(data);
+                    }
+                }
+            } else {
+                data = mask << (bit + 16);
+                data |= (mux & mask) << bit;
+
+                unsafe {
+                    let reg_ptr = self.ioc_base.as_ptr().add(reg) as *mut u32;
+                    reg_ptr.write_volatile(data);
+                }
             }
+            return Ok(());
+        } else {
+            reg += IocBase::Bus.offset();
+        }
+
+        data = mask << (bit + 16);
+        data |= (mux & mask) << bit;
+
+        unsafe {
+            let reg_ptr = self.ioc_base.as_ptr().add(reg) as *mut u32;
+            reg_ptr.write_volatile(data);
         }
 
         Ok(())
