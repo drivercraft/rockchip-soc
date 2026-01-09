@@ -17,29 +17,42 @@ pub struct GpioBank {
 }
 
 impl GpioBank {
-    pub fn new(base: Mmio, iomux: [Iomux; 4]) -> Self {
-        let iomux = [
+    pub fn new(base: Mmio, bank_id: usize, iomux: [Iomux; 4]) -> Self {
+        // 根据 u-boot rockchip_pinctrl_get_soc_data 函数实现 offset 初始化
+        //
+        // RK3588 硬件特性：
+        // - GPIO0 使用 PMU1_IOC (0x0000)
+        // - GPIO1-4 使用 BUS_IOC (0x8000)
+        // - 4-bit IOMUX，每组占用 8 字节（2 个寄存器 × 4 字节）
+        let base_offset = if bank_id == 0 {
+            0x0000 // GPIO0 使用 PMU1_IOC
+        } else {
+            0x8000 // GPIO1-4 使用 BUS_IOC
+        };
+
+        // 每个 iomux 组占用 8 字节（2 个寄存器 × 4 字节）
+        let iomux_regs = [
             IomuxReg {
                 ty: iomux[0],
-                offset: 0x00,
+                offset: base_offset + 0x00, // 引脚 0-7
             },
             IomuxReg {
                 ty: iomux[1],
-                offset: 0x04,
+                offset: base_offset + 0x08, // 引脚 8-15
             },
             IomuxReg {
                 ty: iomux[2],
-                offset: 0x08,
+                offset: base_offset + 0x10, // 引脚 16-23
             },
             IomuxReg {
                 ty: iomux[3],
-                offset: 0x0C,
+                offset: base_offset + 0x18, // 引脚 24-31
             },
         ];
 
         GpioBank {
             base: base.as_ptr() as usize,
-            iomux,
+            iomux: iomux_regs,
         }
     }
 
@@ -212,5 +225,48 @@ impl GpioBank {
             // 输入方向
             Ok(GpioDirection::Input)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_iomux_offset_gpio0() {
+        // GPIO0 应使用 PMU1_IOC 偏移
+        let base = unsafe { Mmio::new_unchecked(0xfd8a0000 as *mut u8) };
+        let iomux = [Iomux::WIDTH_4BIT; 4];
+        let bank = GpioBank::new(base, 0, iomux);
+
+        assert_eq!(bank.iomux[0].offset, 0x0000);
+        assert_eq!(bank.iomux[1].offset, 0x0008);
+        assert_eq!(bank.iomux[2].offset, 0x0010);
+        assert_eq!(bank.iomux[3].offset, 0x0018);
+    }
+
+    #[test]
+    fn test_iomux_offset_gpio1() {
+        // GPIO1 应使用 BUS_IOC 偏移
+        let base = unsafe { Mmio::new_unchecked(0xfec20000 as *mut u8) };
+        let iomux = [Iomux::WIDTH_4BIT; 4];
+        let bank = GpioBank::new(base, 1, iomux);
+
+        assert_eq!(bank.iomux[0].offset, 0x8000);
+        assert_eq!(bank.iomux[1].offset, 0x8008);
+        assert_eq!(bank.iomux[2].offset, 0x8010);
+        assert_eq!(bank.iomux[3].offset, 0x8018);
+    }
+
+    #[test]
+    fn test_offset_increment() {
+        // 验证每个 iomux 组占用 8 字节
+        let base = unsafe { Mmio::new_unchecked(0xfec20000 as *mut u8) };
+        let iomux = [Iomux::WIDTH_4BIT; 4];
+        let bank = GpioBank::new(base, 1, iomux);
+
+        assert_eq!(bank.iomux[1].offset - bank.iomux[0].offset, 0x8);
+        assert_eq!(bank.iomux[2].offset - bank.iomux[1].offset, 0x8);
+        assert_eq!(bank.iomux[3].offset - bank.iomux[2].offset, 0x8);
     }
 }

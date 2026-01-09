@@ -121,7 +121,7 @@ pub fn calc_iomux_config(pin: PinId) -> Option<(IomuxConfig, Option<IomuxConfig>
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::pinctrl::BankId;
+    use crate::BankId;
 
     #[test]
     fn test_ioc_base_offsets() {

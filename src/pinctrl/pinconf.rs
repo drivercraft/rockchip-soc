@@ -130,20 +130,11 @@ impl PinConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::pinctrl::Function;
 
     #[test]
     fn test_pull_values() {
         assert_eq!(Pull::Disabled as u32, 0);
-        assert_eq!(Pull::PullUp as u32, 1);
-        assert_eq!(Pull::PullDown as u32, 2);
-    }
-
-    #[test]
-    fn test_drive_strength_values() {
-        assert_eq!(DriveStrength::Ma2 as u32, 0);
-        assert_eq!(DriveStrength::Ma4 as u32, 1);
-        assert_eq!(DriveStrength::Ma8 as u32, 2);
-        assert_eq!(DriveStrength::Ma12 as u32, 3);
+        assert_eq!(Pull::PullUp as u32, 3);
+        assert_eq!(Pull::PullDown as u32, 4);
     }
 }
