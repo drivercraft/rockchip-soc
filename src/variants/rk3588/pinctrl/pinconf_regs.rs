@@ -172,6 +172,10 @@ const SCHMITT_REGS: &[SchmittEntry] = &[
 /// # 返回
 ///
 /// 返回 `(寄存器偏移, 位偏移)`，如果引脚无效则返回 `None`
+///
+/// # 参考
+///
+/// u-boot: `drivers/pinctrl/rockchip/pinctrl-rk3588.c:rk3588_calc_drv_reg_and_bit`
 pub fn find_drive_entry(pin: PinId) -> Option<(usize, u32)> {
     let pin_num = pin.raw();
 
@@ -181,11 +185,20 @@ pub fn find_drive_entry(pin: PinId) -> Option<(usize, u32)> {
         .rev()
         .find(|e| e.pin_id.raw() <= pin_num)?;
 
-    // 计算位偏移（每 2 个引脚占 8 位）
+    // 计算相对于条目起始引脚的偏移
     let pin_offset = pin_num - entry.pin_id.raw();
-    let bit_offset = pin_offset * 8;
 
-    Some((entry.reg_offset, bit_offset))
+    // 计算寄存器偏移增量（每4个引脚一个寄存器，占4字节）
+    // 参考 u-boot: *reg += ((pin - rk3588_ds_regs[i][0]) / RK3588_DRV_PINS_PER_REG) * 4;
+    const DRV_PINS_PER_REG: u32 = 4;
+    let reg_offset = entry.reg_offset + (pin_offset / DRV_PINS_PER_REG) as usize * 4;
+
+    // 计算位偏移（使用 pin_in_bank，每4个引脚循环，每个引脚4位）
+    // 参考 u-boot: *bit = pin_num % RK3588_DRV_PINS_PER_REG; *bit *= RK3588_DRV_BITS_PER_PIN;
+    const DRV_BITS_PER_PIN: u32 = 4;
+    let bit_offset = (pin.pin_in_bank() % DRV_PINS_PER_REG) * DRV_BITS_PER_PIN;
+
+    Some((reg_offset, bit_offset))
 }
 
 /// 查找 pull 寄存器配置
@@ -197,17 +210,30 @@ pub fn find_drive_entry(pin: PinId) -> Option<(usize, u32)> {
 /// # 返回
 ///
 /// 返回 `(寄存器偏移, 位偏移)`，如果引脚无效则返回 `None`
+///
+/// # 参考
+///
+/// u-boot: `drivers/pinctrl/rockchip/pinctrl-rk3588.c:rk3588_calc_pull_reg_and_bit`
 pub fn find_pull_entry(pin: PinId) -> Option<(usize, u32)> {
     let pin_num = pin.raw();
 
     // 查找寄存器条目
     let entry = PULL_REGS.iter().rev().find(|e| e.pin_id.raw() <= pin_num)?;
 
-    // 计算位偏移（每 8 个引脚占 16 位，每个引脚 2 位）
+    // 计算相对于条目起始引脚的偏移
     let pin_offset = pin_num - entry.pin_id.raw();
-    let bit_offset = pin_offset * 2;
 
-    Some((entry.reg_offset, bit_offset))
+    // 计算寄存器偏移增量（每8个引脚一个寄存器，占4字节）
+    // 参考 u-boot: *reg += ((pin - rk3588_p_regs[i][0]) / RK3588_PULL_PINS_PER_REG) * 4;
+    const PULL_PINS_PER_REG: u32 = 8;
+    let reg_offset = entry.reg_offset + (pin_offset / PULL_PINS_PER_REG) as usize * 4;
+
+    // 计算位偏移（使用 pin_in_bank，每8个引脚循环，每个引脚2位）
+    // 参考 u-boot: *bit = pin_num % RK3588_PULL_PINS_PER_REG; *bit *= RK3588_PULL_BITS_PER_PIN;
+    const PULL_BITS_PER_PIN: u32 = 2;
+    let bit_offset = (pin.pin_in_bank() % PULL_PINS_PER_REG) * PULL_BITS_PER_PIN;
+
+    Some((reg_offset, bit_offset))
 }
 
 /// 查找 schmitt trigger 寄存器配置
@@ -219,6 +245,10 @@ pub fn find_pull_entry(pin: PinId) -> Option<(usize, u32)> {
 /// # 返回
 ///
 /// 返回 `(寄存器偏移, 位偏移)`，如果引脚无效则返回 `None`
+///
+/// # 参考
+///
+/// u-boot: `drivers/pinctrl/rockchip/pinctrl-rk3588.c:rk3588_calc_schmitt_reg_and_bit`
 pub fn find_schmitt_entry(pin: PinId) -> Option<(usize, u32)> {
     let pin_num = pin.raw();
 
@@ -228,11 +258,19 @@ pub fn find_schmitt_entry(pin: PinId) -> Option<(usize, u32)> {
         .rev()
         .find(|e| e.pin_id.raw() <= pin_num)?;
 
-    // 计算位偏移（每个引脚 1 位）
+    // 计算相对于条目起始引脚的偏移
     let pin_offset = pin_num - entry.pin_id.raw();
-    let bit_offset = pin_offset;
 
-    Some((entry.reg_offset, bit_offset))
+    // 计算寄存器偏移增量（每8个引脚一个寄存器，占4字节）
+    // 参考 u-boot: *reg += ((pin - rk3588_smt_regs[i][0]) / RK3588_SMT_PINS_PER_REG) * 4;
+    const SMT_PINS_PER_REG: u32 = 8;
+    let reg_offset = entry.reg_offset + (pin_offset / SMT_PINS_PER_REG) as usize * 4;
+
+    // 计算位偏移（使用 pin_in_bank，每8个引脚循环，每个引脚1位）
+    // 参考 u-boot: *bit = pin_num % RK3588_SMT_PINS_PER_REG;
+    let bit_offset = pin.pin_in_bank() % SMT_PINS_PER_REG;
+
+    Some((reg_offset, bit_offset))
 }
 
 #[cfg(test)]
@@ -272,22 +310,34 @@ mod tests {
 
     #[test]
     fn test_bit_offset_calculation() {
-        // Drive: 每 2 个引脚一个寄存器，每个引脚 8 位
+        // Drive: 每 4 个引脚一个寄存器，每个引脚 4 位
+        // 参考 u-boot: RK3588_DRV_PINS_PER_REG = 4, RK3588_DRV_BITS_PER_PIN = 4
         let pin = PinId::new(0).unwrap();
         let (_, bit_offset) = find_drive_entry(pin).unwrap();
-        assert_eq!(bit_offset, 0);
+        assert_eq!(bit_offset, 0); // (0 % 4) * 4 = 0
 
         let pin = PinId::new(1).unwrap();
         let (_, bit_offset) = find_drive_entry(pin).unwrap();
-        assert_eq!(bit_offset, 8);
+        assert_eq!(bit_offset, 4); // (1 % 4) * 4 = 4
 
         // Pull: 每 8 个引脚一个寄存器，每个引脚 2 位
+        // 参考 u-boot: RK3588_PULL_PINS_PER_REG = 8, RK3588_PULL_BITS_PER_PIN = 2
         let pin = PinId::new(0).unwrap();
         let (_, bit_offset) = find_pull_entry(pin).unwrap();
-        assert_eq!(bit_offset, 0);
+        assert_eq!(bit_offset, 0); // (0 % 8) * 2 = 0
 
         let pin = PinId::new(1).unwrap();
         let (_, bit_offset) = find_pull_entry(pin).unwrap();
-        assert_eq!(bit_offset, 2);
+        assert_eq!(bit_offset, 2); // (1 % 8) * 2 = 2
+
+        // Schmitt: 每 8 个引脚一个寄存器，每个引脚 1 位
+        // 参考 u-boot: RK3588_SMT_PINS_PER_REG = 8, RK3588_SMT_BITS_PER_PIN = 1
+        let pin = PinId::new(0).unwrap();
+        let (_, bit_offset) = find_schmitt_entry(pin).unwrap();
+        assert_eq!(bit_offset, 0); // 0 % 8 = 0
+
+        let pin = PinId::new(7).unwrap();
+        let (_, bit_offset) = find_schmitt_entry(pin).unwrap();
+        assert_eq!(bit_offset, 7); // 7 % 8 = 7
     }
 }
