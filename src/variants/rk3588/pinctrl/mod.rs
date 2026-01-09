@@ -103,12 +103,23 @@ impl Pinctrl {
         if id.bank().raw() == 0 {
             if (12..=31).contains(&pin) {
                 if mux < 8 {
+                    // 写 PMU2_IOC 寄存器（带 mux 值）
                     let reg0 = reg + IocBase::Pmu2.offset() - 0xC;
                     data = mask << (bit + 16);
                     data |= mux << bit;
 
                     unsafe {
                         let reg_ptr = self.ioc_base.as_ptr().add(reg0) as *mut u32;
+                        reg_ptr.write_volatile(data);
+                    }
+
+                    // 写 BUS_IOC 寄存器（只写掩码，不写 mux 值）
+                    // 参考 u-boot: drivers/pinctrl/rockchip/pinctrl-rk3588.c:58-60
+                    let reg1 = reg + IocBase::Bus.offset();
+                    data = mask << (bit + 16);
+
+                    unsafe {
+                        let reg_ptr = self.ioc_base.as_ptr().add(reg1) as *mut u32;
                         reg_ptr.write_volatile(data);
                     }
                 } else {
