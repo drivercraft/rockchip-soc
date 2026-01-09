@@ -5,13 +5,38 @@ mod reg;
 use reg::*;
 use tock_registers::interfaces::{Readable, Writeable};
 
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct IomuxReg {
+    pub ty: Iomux,
+    pub offset: usize,
+}
+
 pub struct GpioBank {
     base: usize,
-    iomux: [Iomux; 4],
+    pub(crate) iomux: [IomuxReg; 4],
 }
 
 impl GpioBank {
     pub fn new(base: Mmio, iomux: [Iomux; 4]) -> Self {
+        let iomux = [
+            IomuxReg {
+                ty: iomux[0],
+                offset: 0x00,
+            },
+            IomuxReg {
+                ty: iomux[1],
+                offset: 0x04,
+            },
+            IomuxReg {
+                ty: iomux[2],
+                offset: 0x08,
+            },
+            IomuxReg {
+                ty: iomux[3],
+                offset: 0x0C,
+            },
+        ];
+
         GpioBank {
             base: base.as_ptr() as usize,
             iomux,
@@ -29,12 +54,12 @@ impl GpioBank {
         }
         let iomux_num = pin_in_bank / 8;
 
-        if self.iomux[iomux_num as usize].contains(Iomux::UNROUTED) {
+        if self.iomux[iomux_num as usize].ty.contains(Iomux::UNROUTED) {
             debug!("verify_mux: pin {:?} does not support routing", pin);
             return Err(PinctrlError::Unsupported);
         }
 
-        if self.iomux[iomux_num as usize].contains(Iomux::GPIO_ONLY) && mux != Iomux::GPIO_ONLY {
+        if self.iomux[iomux_num as usize].ty.contains(Iomux::GPIO_ONLY) && mux != Iomux::GPIO_ONLY {
             debug!("verify_mux: pin {:?} only supports GPIO function", pin);
             return Err(PinctrlError::Unsupported);
         }
@@ -44,7 +69,7 @@ impl GpioBank {
 
     pub fn iomux_gpio_only(&self, pin: PinId) -> bool {
         let iomux_num = pin.pin_in_bank() / 8;
-        self.iomux[iomux_num as usize].contains(Iomux::GPIO_ONLY)
+        self.iomux[iomux_num as usize].ty.contains(Iomux::GPIO_ONLY)
     }
 
     /// 设置引脚方向（统一接口）

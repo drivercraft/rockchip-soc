@@ -48,7 +48,7 @@ impl PinManager {
     /// - GPIO0-4: 0xfd8a0000, 0xfec20000, 0xfec30000, 0xfec40000, 0xfec50000
     pub fn new(ioc: Mmio, gpio: [Mmio; 5]) -> Self {
         let iomux = [Iomux::WIDTH_4BIT; 4];
-        Self {
+        let mut s = Self {
             pinctrl: unsafe { Pinctrl::new(ioc) },
             gpio_banks: [
                 GpioBank::new(gpio[0], iomux), // GPIO0 (Pin 0-31)
@@ -57,7 +57,13 @@ impl PinManager {
                 GpioBank::new(gpio[3], iomux), // GPIO3 (Pin 96-127)
                 GpioBank::new(gpio[4], iomux), // GPIO4 (Pin 128-159)
             ],
-        }
+        };
+        s.init();
+        s
+    }
+
+    fn init(&mut self) {
+
     }
 
     /// 读取 GPIO 引脚值
