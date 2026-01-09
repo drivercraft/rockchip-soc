@@ -4,7 +4,7 @@
 
 use crate::{
     Mmio, PinConfig, PinId,
-    pinctrl::{PinctrlResult, pinmux::Iomux},
+    pinctrl::{Iomux, PinctrlResult},
     variants::rk3588::{gpio::GpioBank, pinctrl::Pinctrl},
 };
 

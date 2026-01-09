@@ -182,7 +182,7 @@ pub fn find_drive_entry(pin: PinId) -> Option<(usize, u32)> {
         .find(|e| e.pin_id.raw() <= pin_num)?;
 
     // 计算位偏移（每 2 个引脚占 8 位）
-    let pin_offset = (pin_num - entry.pin_id.raw()) as u32;
+    let pin_offset = pin_num - entry.pin_id.raw();
     let bit_offset = pin_offset * 8;
 
     Some((entry.reg_offset, bit_offset))
@@ -204,7 +204,7 @@ pub fn find_pull_entry(pin: PinId) -> Option<(usize, u32)> {
     let entry = PULL_REGS.iter().rev().find(|e| e.pin_id.raw() <= pin_num)?;
 
     // 计算位偏移（每 8 个引脚占 16 位，每个引脚 2 位）
-    let pin_offset = (pin_num - entry.pin_id.raw()) as u32;
+    let pin_offset = pin_num - entry.pin_id.raw();
     let bit_offset = pin_offset * 2;
 
     Some((entry.reg_offset, bit_offset))

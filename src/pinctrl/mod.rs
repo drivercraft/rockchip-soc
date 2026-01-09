@@ -4,18 +4,11 @@
 
 use core::fmt;
 
-mod fdt;
 pub mod id;
 mod pinconf;
-pub mod pinmux;
 
-use alloc::vec::Vec;
-pub use id::{BankId, PinId};
-pub use pinconf::{PinConfig, Pull};
-pub use pinmux::Function;
-
-// 重新导出所有 GPIO 常量
-pub use id::*;
+pub use id::PinId;
+pub use pinconf::{Iomux, PinConfig, Pull};
 
 /// GPIO 方向配置（用于设置方向）
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

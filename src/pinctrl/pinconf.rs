@@ -4,7 +4,7 @@
 
 use core::ptr::NonNull;
 
-use crate::{PinId, pinctrl::pinmux::Iomux};
+use crate::PinId;
 
 /// 引脚上下拉配置
 ///
@@ -26,6 +26,42 @@ pub enum Pull {
     PullUp = 3,
     PullDown = 4,
     PullPinDefault = 5,
+}
+
+bitflags::bitflags! {
+    /// IOMUX 配置标志
+    ///
+    /// 定义引脚复用控制的属性和特性,对应 Rockchip pinctrl 驱动中的 iomux 标志。
+    ///
+    /// # 标志说明
+    ///
+    /// - `GPIO_ONLY`: 引脚仅支持 GPIO 模式,不支持复用功能
+    /// - `WIDTH_4BIT`: 功能选择位宽为 4 位
+    /// - `SOURCE_PMU`: 寄存器位于 PMU (Power Management Unit) 地址空间
+    /// - `UNROUTED`: 未路由的引脚(无实际连接)
+    /// - `WIDTH_3BIT`: 功能选择位宽为 3 位
+    /// - `8WIDTH_2BIT`: 8 个引脚共享 2 位宽度的功能选择
+    /// - `WRITABLE_32BIT`: 使用 32 位写操作(而非 16 位)
+    /// - `L_SOURCE_PMU`: 低 16 位位于 PMU 地址空间
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub struct Iomux: u8 {
+        /// 仅 GPIO 模式(无复用功能)
+        const GPIO_ONLY = 1;
+        /// 功能选择位宽为 4 位
+        const WIDTH_4BIT = 1 << 1;
+        /// 寄存器位于 PMU 地址空间
+        const SOURCE_PMU = 1 << 2;
+        /// 未路由的引脚
+        const UNROUTED = 1 << 3;
+        /// 功能选择位宽为 3 位
+        const WIDTH_3BIT = 1 << 4;
+        /// 8 引脚共享 2 位功能选择
+        const WIDTH_8_2BIT = 1 << 5;
+        /// 使用 32 位写操作
+        const WRITABLE_32BIT = 1 << 6;
+        /// 低 16 位位于 PMU 地址空间
+        const L_SOURCE_PMU = 1 << 7;
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

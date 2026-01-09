@@ -1,5 +1,3 @@
-use core::ops::RangeBounds;
-
 pub mod pll;
 
 def_id!(ClkId, u64);
