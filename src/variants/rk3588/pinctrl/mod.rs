@@ -250,11 +250,8 @@ impl Pinctrl {
         };
 
         debug!(
-            "get_mux: pin={}, reg_offset={:#x}, bit_offset={}, reg_value={:#x}",
-            pin.raw(),
-            config.reg_offset,
-            config.bit_offset,
-            reg_value
+            "get_mux: pin={pin}, reg_offset={:#x}, bit_offset={}, reg_value={:#x}",
+            config.reg_offset, config.bit_offset, reg_value
         );
 
         // 提取功能配置字段（每个引脚占 4 位）
@@ -290,19 +287,16 @@ impl Pinctrl {
             reg_ptr.read_volatile()
         };
 
-        log::info!(
+        debug!(
             "get_pull: pin={}, reg_offset={:#x}, bit_offset={}, reg_value={:#x}",
-            pin.raw(),
-            reg_offset,
-            bit_offset,
-            reg_value
+            pin, reg_offset, bit_offset, reg_value
         );
 
         // 提取 pull 配置字段（每个 pull 占 2 位）
         let mask = 0x3u32 << bit_offset;
         let pull_value = (reg_value & mask) >> bit_offset;
 
-        log::info!("get_pull: pull_value={}, mask={:#x}", pull_value, mask);
+        debug!("get_pull: pull_value={}, mask={:#x}", pull_value, mask);
 
         // 转换为 Pull 枚举
         match pull_value {
@@ -341,10 +335,7 @@ impl Pinctrl {
 
         debug!(
             "get_drive: pin={}, reg_offset={:#x}, bit_offset={}, reg_value={:#x}",
-            pin.raw(),
-            reg_offset,
-            bit_offset,
-            reg_value
+            pin, reg_offset, bit_offset, reg_value
         );
 
         // 提取 drive 配置字段（每个 drive 占 2 位）

@@ -1,3 +1,5 @@
+use core::fmt::{Debug, Display};
+
 /// 全局引脚标识 (0-159)
 ///
 /// RK3588 有 5 个 GPIO bank，每个 bank 32 个引脚，共 160 个引脚。
@@ -19,8 +21,29 @@
 /// let pin = PinId::from_bank_pin(BankId::new(1).unwrap(), 0).unwrap();
 /// assert_eq!(pin.raw(), 32);
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PinId(u32);
+
+impl Debug for PinId {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        Display::fmt(self, f)?;
+        write!(f, "({})", self.raw())
+    }
+}
+
+impl Display for PinId {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let pin = self.pin_in_bank();
+        let group = match pin / 8 {
+            0 => 'A',
+            1 => 'B',
+            2 => 'C',
+            3 => 'D',
+            _ => '?',
+        };
+        write!(f, "GPIO{}-{group}{}", self.bank().raw(), pin % 8)
+    }
+}
 
 impl PinId {
     /// 创建新的 PinId

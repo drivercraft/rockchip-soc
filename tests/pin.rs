@@ -15,16 +15,16 @@ use log::*;
 pub fn test_pin() {
     info!("Testing RK3588 PinManager...");
 
-    let pinctrl = find_pinctrl();
+    let mut pinctrl = find_pinctrl();
 
-    read_pinctrl(&pinctrl, "/pinctrl/usb/vcc5v0-host-en");
-    read_pinctrl(&pinctrl, "/pinctrl/usb-typec/usbc0-int");
-    read_pinctrl(&pinctrl, "/pinctrl/usb-typec/typec5v-pwren");
+    // read_pinctrl(&pinctrl, "/pinctrl/usb/vcc5v0-host-en");
+    // read_pinctrl(&pinctrl, "/pinctrl/usb-typec/usbc0-int");
+    read_pinctrl(&mut pinctrl, "/pinctrl/usb-typec/typec5v-pwren");
 
     info!("=== Test Complete ===");
 }
 
-fn read_pinctrl(m: &PinManager, pinctrl_node: &str) {
+fn read_pinctrl(m: &mut PinManager, pinctrl_node: &str) {
     info!("Reading pinctrl node: {}", pinctrl_node);
     let PlatformInfoKind::DeviceTree(fdt) = &global_val().platform_info;
     let fdt = fdt.get();
@@ -46,6 +46,8 @@ fn read_pinctrl(m: &PinManager, pinctrl_node: &str) {
     info!("PinConfig: {:?}", pin_conf);
 
     let config = m.get_config(pin_conf.id).expect("Failed to get pin config");
+
+    m.set_config(pin_conf);
 
     info!("act config: {:?}", config);
 }
