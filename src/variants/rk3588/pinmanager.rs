@@ -119,7 +119,10 @@ impl PinManager {
     }
 
     pub fn get_config(&self, pin: PinId) -> PinctrlResult<PinConfig> {
-        let function = self.pinctrl.get_mux(pin)?;
+        // 获取 IomuxReg（组内偏移）
+        let iomux_reg = self.bank(pin).iomux[pin.pin_in_bank() as usize / 8];
+
+        let function = self.pinctrl.get_mux(pin, iomux_reg)?;
 
         let pull = self.pinctrl.get_pull(pin)?;
 

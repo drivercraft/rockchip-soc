@@ -232,35 +232,60 @@ impl Pinctrl {
     ///
     /// # 参数
     ///
-    /// * `pin` - 引脚 ID
+    /// * `id` - 引脚 ID
+    /// * `reg` - IOMUX 寄存器信息（组内偏移）
     ///
     /// # 返回
     ///
     /// 返回引脚当前的功能配置
-    pub fn get_mux(&self, pin: PinId) -> PinctrlResult<Iomux> {
-        use crate::variants::rk3588::pinctrl::iomux::calc_iomux_config;
+    ///
+    /// # 参考
+    ///
+    /// u-boot: `drivers/pinctrl/rockchip/pinctrl-rockchip-core.c:rockchip_get_mux()`
+    pub(crate) fn get_mux(&self, id: PinId, reg: IomuxReg) -> PinctrlResult<Iomux> {
+        let pin = id.pin_in_bank();
+        let mut reg = reg.offset; // 组内偏移
 
-        let (config, _extra_config) =
-            calc_iomux_config(pin).ok_or(PinctrlError::InvalidPinId(pin))?;
+        if pin % 8 >= 4 {
+            reg += 0x4; // 每组寄存器占用 8 字节，后4个引脚在高4字节
+        }
+
+        let bit = (pin % 4) * 4;
+        let mask = 0xfu32;
+
+        // GPIO0 的特殊处理
+        if id.bank().raw() == 0 {
+            // GPIO0: 直接使用组内偏移（不加基地址）
+            let reg_value = unsafe {
+                let reg_ptr = self.ioc_base.as_ptr().add(reg) as *const u32;
+                reg_ptr.read_volatile()
+            };
+
+            debug!(
+                "get_mux: pin={id}, reg_offset={:#x}, bit={}, reg_value={:#x}",
+                reg, bit, reg_value
+            );
+
+            let func_num = (reg_value & (mask << bit)) >> bit;
+            return Iomux::from_bits(func_num as u8).ok_or(PinctrlError::InvalidConfig);
+        } else {
+            // GPIO1-4: 加上 BUS_IOC 基地址
+            reg += IocBase::Bus.offset();
+        }
 
         // 读取寄存器值
         let reg_value = unsafe {
-            let reg_ptr = self.ioc_base.as_ptr().add(config.reg_offset) as *const u32;
+            let reg_ptr = self.ioc_base.as_ptr().add(reg) as *const u32;
             reg_ptr.read_volatile()
         };
 
         debug!(
-            "get_mux: pin={pin}, reg_offset={:#x}, bit_offset={}, reg_value={:#x}",
-            config.reg_offset, config.bit_offset, reg_value
+            "get_mux: pin={id}, reg_offset={:#x}, bit={}, reg_value={:#x}",
+            reg, bit, reg_value
         );
 
         // 提取功能配置字段（每个引脚占 4 位）
-        let mask = 0xfu32 << config.bit_offset;
-        let func_num = (reg_value & mask) >> config.bit_offset;
-
-        debug!("get_mux: func_num={}, mask={:#x}", func_num, mask);
-
-        // 转换为 Function 枚举
+        let func_num = (reg_value & (mask << bit)) >> bit;
         Iomux::from_bits(func_num as u8).ok_or(PinctrlError::InvalidConfig)
     }
 
