@@ -93,12 +93,20 @@ impl PinManager {
         &self.gpio_banks[pin.bank().raw() as usize]
     }
 
-    pub fn set_config(&mut self, config: PinConfig) -> PinctrlResult<()> {
-        debug!("set_config: {:?}", config);
+    fn set_mux(&self, config: &PinConfig) -> PinctrlResult<()> {
         self.bank(config.id).verify_mux(config.id, config.mux)?;
+        if self.bank(config.id).iomux_gpio_only(config.id) {
+            return Ok(());
+        }
 
         self.pinctrl.set_mux(config.id, config.mux)?;
 
+        Ok(())
+    }
+
+    pub fn set_config(&mut self, config: PinConfig) -> PinctrlResult<()> {
+        debug!("set_config: {:?}", config);
+        self.set_mux(&config)?;
         self.pinctrl.set_pull(config.id, config.pull)?;
 
         if let Some(drive) = config.drive {

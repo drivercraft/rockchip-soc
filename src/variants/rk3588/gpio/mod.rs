@@ -42,6 +42,11 @@ impl GpioBank {
         Ok(())
     }
 
+    pub fn iomux_gpio_only(&self, pin: PinId) -> bool {
+        let iomux_num = pin.pin_in_bank() / 8;
+        self.iomux[iomux_num as usize].contains(Iomux::GPIO_ONLY)
+    }
+
     /// 设置引脚方向（统一接口）
     ///
     /// # 参数
