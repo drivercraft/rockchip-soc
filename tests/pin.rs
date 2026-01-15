@@ -80,7 +80,7 @@ fn find_pinctrl() -> PinCtrl {
         gpio_banks[idx] = gpio_mmio;
     }
 
-    PinCtrl::new(ioc, gpio_banks)
+    PinCtrl::new(ioc, &gpio_banks)
 }
 
 pub fn get_grf(node: &Node, name: &str) -> NonNull<u8> {

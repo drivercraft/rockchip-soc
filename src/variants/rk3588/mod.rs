@@ -1,10 +1,11 @@
-pub mod cru;
-pub mod pinctrl;
+pub(crate) mod cru;
+pub(crate) mod pinctrl;
 mod syscon;
+
+pub use cru::clock::*;
 
 // =============================================================================
 // 公开导出
 // =============================================================================
 
-pub use cru::Cru;
 pub use pinctrl::PinCtrl;

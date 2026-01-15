@@ -21,10 +21,12 @@ pub(crate) mod variants;
 
 use core::ptr::NonNull;
 
-pub use pinctrl::id::*;
-pub use pinctrl::{GpioDirection, PinConfig, PinCtrl, PinCtrlOp, PinctrlResult, Pull};
-pub type Mmio = NonNull<u8>;
+pub use clock::{ClkId, ClockError, ClockResult, Cru, CruOp};
+pub use pinctrl::{GpioDirection, PinConfig, PinCtrl, PinCtrlOp, PinctrlResult, Pull, id::*};
 pub use rst::{ResetRockchip, RstId};
+pub use variants::*;
+
+pub type Mmio = NonNull<u8>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SocType {

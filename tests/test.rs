@@ -19,7 +19,7 @@ mod tests {
         time::since_boot,
     };
     use log::{info, warn};
-    use rockchip_soc::rk3588::{cru::CCLK_EMMC, *};
+    use rockchip_soc::{Cru, CruOp, SocType, rk3588::CCLK_EMMC};
     use sdmmc::emmc::{
         EMmcHost,
         clock::{Clk, ClkError, init_global_clk},
@@ -37,14 +37,14 @@ mod tests {
     #[test]
     fn it_works() {
         let cru3588 = 0xfd7c0000usize;
-        let sys_grf = Cru::grf_mmio_ls()[0];
+        // let sys_grf = Cru::grf_mmio_ls()[0];
+        let sys_grf_base = 0xfd58c000usize;
+        let sys_grf_size = 0x1000usize;
 
         let base = iomap(cru3588.into(), 0x5c000);
-        let sys_grf = iomap(sys_grf.base.into(), sys_grf.size);
+        let sys_grf = iomap(sys_grf_base.into(), sys_grf_size);
 
-        let mut cru = Cru::new(base, sys_grf);
-        cru.init();
-
+        let cru = Cru::new(SocType::Rk3588, base, sys_grf);
         initclk(cru);
 
         test_with_emmc();
@@ -96,7 +96,7 @@ mod tests {
         let mut write_buffer: [u8; 512] = [0; 512];
         for i in 0..512 {
             // write_buffer[i] = (i % 256) as u8; // Fill with test pattern data
-            write_buffer[i] = 0 as u8;
+            write_buffer[i] = 0_u8;
         }
 
         // Write data
@@ -203,7 +203,7 @@ mod tests {
     impl Clk for ClkUnit {
         fn emmc_get_clk(&self) -> Result<u64, ClkError> {
             if let Ok(rate) = INIT.wait().lock().clk_get_rate(CCLK_EMMC) {
-                Ok(rate as u64)
+                Ok(rate)
             } else {
                 Err(ClkError::InvalidClockRate)
             }
@@ -211,7 +211,7 @@ mod tests {
 
         fn emmc_set_clk(&self, rate: u64) -> Result<u64, ClkError> {
             if let Ok(rate) = INIT.wait().lock().clk_set_rate(CCLK_EMMC, rate) {
-                Ok(rate as u64)
+                Ok(rate)
             } else {
                 Err(ClkError::InvalidClockRate)
             }

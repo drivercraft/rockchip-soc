@@ -6,8 +6,8 @@ use alloc::vec::Vec;
 
 use super::clock::*;
 use super::consts::*;
-use super::error::{ClockError, ClockResult};
 use super::*;
+use crate::clock::{ClockError, ClockResult};
 
 impl Cru {
     // ========================================================================
@@ -409,8 +409,6 @@ impl Cru {
     ///
     /// 如果时钟 ID 不支持，返回 `ClockError::UnsupportedClock`
     pub(crate) fn mmc_get_rate(&self, id: ClkId) -> ClockResult<u64> {
-        use crate::clock::ClkId;
-
         // 根据时钟 ID 确定寄存器和位域
         let (con_reg, sel_shift, sel_mask, div_shift, div_mask, _parent_sources): (
             u32,
@@ -420,7 +418,7 @@ impl Cru {
             u32,
             &[u64],
         ) = match id {
-            ClkId::CCLK_EMMC => {
+            CCLK_EMMC => {
                 // CLksel_CON(77): sel[14:15], div[8:13]
                 static PARENTS: [u64; 3] = [0, 0, 24 * MHZ];
                 (
@@ -432,7 +430,7 @@ impl Cru {
                     &PARENTS, // 稍后填充实际值
                 )
             }
-            ClkId::BCLK_EMMC => {
+            BCLK_EMMC => {
                 // CLKSEL_CON(78): sel[5], div[0:4]
                 static PARENTS: [u64; 2] = [0, 0];
                 (
@@ -444,7 +442,7 @@ impl Cru {
                     &PARENTS, // 稍后填充实际值
                 )
             }
-            ClkId::CCLK_SRC_SDIO => {
+            CCLK_SRC_SDIO => {
                 // CLKSEL_CON(172): sel[8:9], div[2:7]
                 static PARENTS: [u64; 3] = [0, 0, 24 * MHZ];
                 (
@@ -456,7 +454,7 @@ impl Cru {
                     &PARENTS, // 稍后填充实际值
                 )
             }
-            ClkId::SCLK_SFC => {
+            SCLK_SFC => {
                 // CLKSEL_CON(78): sel[12:13], div[6:11]
                 static PARENTS: [u64; 3] = [0, 0, 24 * MHZ];
                 (
@@ -475,10 +473,10 @@ impl Cru {
 
         // 动态填充父时钟频率
         let parents: Vec<u64> = match id {
-            ClkId::CCLK_EMMC | ClkId::CCLK_SRC_SDIO | ClkId::SCLK_SFC => {
+            CCLK_EMMC | CCLK_SRC_SDIO | SCLK_SFC => {
                 vec![self.gpll_hz, self.cpll_hz, 24 * MHZ]
             }
-            ClkId::BCLK_EMMC => vec![self.gpll_hz, self.cpll_hz],
+            BCLK_EMMC => vec![self.gpll_hz, self.cpll_hz],
             _ => return Err(ClockError::unsupported(id)),
         };
 
@@ -524,8 +522,6 @@ impl Cru {
     ///
     /// 如果时钟 ID 不支持或无法设置目标频率，返回错误
     pub(crate) fn mmc_set_rate(&mut self, id: ClkId, rate_hz: u64) -> ClockResult<u64> {
-        use crate::clock::ClkId;
-
         // 根据时钟 ID 确定寄存器和位域，以及可用的时钟源
         let (con_reg, sel_shift, sel_mask, div_shift, div_mask, parent_sources): (
             u32,
@@ -535,7 +531,7 @@ impl Cru {
             u32,
             &[(u64, u32)],
         ) = match id {
-            ClkId::CCLK_EMMC => {
+            CCLK_EMMC => {
                 // CLKSEL_CON(77): sel[14:15], div[8:13]
                 static SOURCES: [(u64, u32); 3] = [
                     (0, clk_sel77::CCLK_EMMC_SEL_GPLL),
@@ -551,7 +547,7 @@ impl Cru {
                     &SOURCES, // 稍后填充实际值
                 )
             }
-            ClkId::BCLK_EMMC => {
+            BCLK_EMMC => {
                 // CLKSEL_CON(78): sel[5], div[0:4]
                 static SOURCES: [(u64, u32); 2] = [
                     (0, clk_sel78::BCLK_EMMC_SEL_GPLL),
@@ -566,7 +562,7 @@ impl Cru {
                     &SOURCES, // 稍后填充实际值
                 )
             }
-            ClkId::CCLK_SRC_SDIO => {
+            CCLK_SRC_SDIO => {
                 // CLKSEL_CON(172): sel[8:9], div[2:7]
                 static SOURCES: [(u64, u32); 3] = [
                     (0, clk_sel172::CCLK_SDIO_SRC_SEL_GPLL),
@@ -582,7 +578,7 @@ impl Cru {
                     &SOURCES, // 稍后填充实际值
                 )
             }
-            ClkId::SCLK_SFC => {
+            SCLK_SFC => {
                 // CLKSEL_CON(78): sel[12:13], div[6:11]
                 static SOURCES: [(u64, u32); 3] = [
                     (0, clk_sel78::SCLK_SFC_SEL_GPLL),
@@ -605,12 +601,12 @@ impl Cru {
 
         // 动态构建时钟源列表（填充实际 PLL 频率）
         let sources: Vec<(u64, u32)> = match id {
-            ClkId::CCLK_EMMC | ClkId::CCLK_SRC_SDIO | ClkId::SCLK_SFC => vec![
+            CCLK_EMMC | CCLK_SRC_SDIO | SCLK_SFC => vec![
                 (self.gpll_hz, parent_sources[0].1),
                 (self.cpll_hz, parent_sources[1].1),
                 (24 * MHZ, parent_sources[2].1),
             ],
-            ClkId::BCLK_EMMC => vec![
+            BCLK_EMMC => vec![
                 (self.gpll_hz, parent_sources[0].1),
                 (self.cpll_hz, parent_sources[1].1),
             ],

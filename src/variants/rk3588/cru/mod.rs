@@ -6,7 +6,6 @@ use crate::{
 
 pub mod clock;
 mod consts;
-mod error;
 mod gate;
 mod peripheral;
 mod pll;
@@ -17,8 +16,9 @@ mod pll;
 
 pub use clock::*;
 pub use consts::*;
-pub use error::*;
 pub use pll::*;
+
+use crate::clock::*;
 
 // =============================================================================
 // 内部常量定义
@@ -60,16 +60,48 @@ impl Debug for Cru {
     }
 }
 
+impl CruOp for Cru {
+    fn reset_assert(&mut self, id: RstId) {
+        self.reset.reset_assert(id);
+    }
+
+    fn reset_deassert(&mut self, id: RstId) {
+        self.reset.reset_deassert(id);
+    }
+
+    fn clk_enable(&mut self, id: ClkId) -> ClockResult<()> {
+        self.clk_enable(id)
+    }
+
+    fn clk_disable(&mut self, id: ClkId) -> ClockResult<()> {
+        self.clk_disable(id)
+    }
+
+    fn clk_is_enabled(&self, id: ClkId) -> ClockResult<bool> {
+        self.clk_is_enabled(id)
+    }
+
+    fn clk_get_rate(&self, id: crate::clock::ClkId) -> ClockResult<u64> {
+        self.clk_get_rate(id)
+    }
+
+    fn clk_set_rate(&mut self, id: crate::clock::ClkId, rate_hz: u64) -> ClockResult<u64> {
+        self.clk_set_rate(id, rate_hz)
+    }
+}
+
 impl Cru {
     pub fn new(base: Mmio, sys_grf: Mmio) -> Self {
-        Cru {
+        let mut c = Cru {
             base: base.as_ptr() as usize,
             _grf: sys_grf.as_ptr() as usize,
             cpll_hz: 0,
             gpll_hz: 0,
             ppll_hz: 0,
             reset: ResetRockchip::new(base.as_ptr() as usize + SOFTRST_CON_OFFSET as usize, 49158),
-        }
+        };
+        c.init();
+        c
     }
 
     /// 初始化并验证 CRU 配置
@@ -129,21 +161,18 @@ impl Cru {
         //       = (1188 + 300 - 1) / 300 - 1 = 4 - 1 = 3
         let expected_div = GPLL_HZ.div_ceil(300 * MHZ) - 1;
         if bus_root_sel != ACLK_BUS_ROOT_SEL_GPLL {
-            log::warn!(
+            warn!(
                 "⚠ CRU@{:x}: ACLK_BUS_ROOT source mismatch! u-boot: GPLL(0), current: {}",
-                self.base,
-                bus_root_sel
+                self.base, bus_root_sel
             );
         } else {
             debug!("✓ ACLK_BUS_ROOT source matches u-boot (GPLL)");
         }
 
         if bus_root_div != expected_div as u32 {
-            log::warn!(
+            warn!(
                 "⚠ CRU@{:x}: ACLK_BUS_ROOT div mismatch! u-boot: {}, current: {}",
-                self.base,
-                expected_div,
-                bus_root_div
+                self.base, expected_div, bus_root_div
             );
         } else {
             debug!("✓ ACLK_BUS_ROOT div matches u-boot ({})", expected_div);
