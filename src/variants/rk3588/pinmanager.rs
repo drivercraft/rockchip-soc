@@ -3,7 +3,7 @@
 //! 统一的引脚管理器，整合 Pinctrl 和 GpioBank，提供简洁易用的引脚配置和 GPIO 操作接口。
 
 use crate::{
-    Mmio, PinConfig, PinId,
+    GpioDirection, Mmio, PinConfig, PinId,
     pinctrl::{Iomux, PinctrlResult},
     variants::rk3588::{gpio::GpioBank, pinctrl::Pinctrl},
 };
@@ -134,6 +134,14 @@ impl PinManager {
             pull,
             drive: Some(drive),
         })
+    }
+
+    pub fn gpio_direction(&self, pin: PinId) -> PinctrlResult<GpioDirection> {
+        self.bank(pin).get_direction(pin)
+    }
+
+    pub fn set_gpio_direction(&self, pin: PinId, direction: GpioDirection) -> PinctrlResult<()> {
+        self.bank(pin).set_direction(pin, direction)
     }
 
     // /// 配置引脚为外设功能（UART/I2C/SPI 等）

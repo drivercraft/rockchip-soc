@@ -2,21 +2,6 @@
 //!
 //! RK3588 的引脚复用配置是规则分布的，使用算法计算而非静态表。
 
-use crate::PinId;
-
-/// iomux 寄存器配置
-#[derive(Debug, Clone, Copy)]
-pub struct IomuxConfig {
-    /// 寄存器绝对地址（相对 IOC 基地址的偏移）
-    pub reg_offset: usize,
-
-    /// 位偏移（每个引脚占 4 位）
-    pub bit_offset: u32,
-
-    /// 是否需要特殊的双寄存器配置（GPIO0 的某些引脚）
-    pub dual_register: bool,
-}
-
 /// IOC 基地址类型
 #[derive(Debug, Clone, Copy)]
 pub enum IocBase {
@@ -52,70 +37,6 @@ impl IocBase {
             Self::Emmc => 0xD000,
         }
     }
-}
-
-/// 计算引脚的 iomux 配置
-///
-/// # 参数
-///
-/// * `pin` - 引脚 ID
-///
-/// # 返回
-///
-/// 返回 `Some(IomuxConfig)` 如果引脚有效，否则返回 `None`
-pub fn calc_iomux_config(pin: PinId) -> Option<(IomuxConfig, Option<IomuxConfig>)> {
-    let bank = pin.bank().raw();
-    let pin_in_bank = pin.pin_in_bank();
-
-    // 每组 8 个引脚，每组 2 个寄存器（每个寄存器 4 个引脚）
-    let iomux_num = pin_in_bank / 8;
-    let reg_in_group = if (pin_in_bank % 8) >= 4 { 0x4 } else { 0x0 };
-    let bit_offset = (pin_in_bank % 4) * 4;
-
-    // 基础寄存器偏移（相对 PMU1_IOC）
-    let base_reg_offset = (iomux_num * 8) as usize + reg_in_group as usize;
-
-    // GPIO0 (bank 0) 的特殊处理
-    if bank == 0 {
-        // GPIO0_PB4 (pin 12) 到 GPIO0_PD7 (pin 31) 需要双寄存器配置
-        if (12..=31).contains(&pin_in_bank) {
-            let pmu2_offset = base_reg_offset + IocBase::Pmu2.offset();
-            let bus_offset = base_reg_offset + IocBase::Bus.offset();
-
-            let pmu2_config = IomuxConfig {
-                reg_offset: pmu2_offset - 0xC, // 调整偏移
-                bit_offset,
-                dual_register: false,
-            };
-
-            let bus_config = IomuxConfig {
-                reg_offset: bus_offset,
-                bit_offset,
-                dual_register: false,
-            };
-
-            return Some((pmu2_config, Some(bus_config)));
-        }
-
-        // GPIO0_PA0 到 GPIO0_PB3 使用 PMU1_IOC
-        let config = IomuxConfig {
-            reg_offset: base_reg_offset,
-            bit_offset,
-            dual_register: false,
-        };
-
-        return Some((config, None));
-    }
-
-    // GPIO1-4 (bank 1-4) 使用 BUS_IOC
-    let bus_offset = base_reg_offset + IocBase::Bus.offset();
-    let config = IomuxConfig {
-        reg_offset: bus_offset,
-        bit_offset,
-        dual_register: false,
-    };
-
-    Some((config, None))
 }
 
 #[cfg(test)]

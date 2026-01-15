@@ -33,48 +33,6 @@ impl Pinctrl {
         Self { ioc_base }
     }
 
-    // /// 设置引脚功能（pinmux）
-    // ///
-    // /// 配置引脚的复用功能（GPIO、UART、SPI 等）。
-    // ///
-    // /// # 参数
-    // ///
-    // /// * `pin` - 引脚 ID
-    // /// * `function` - 引脚功能
-    // ///
-    // /// # 参考
-    // ///
-    // /// u-boot: `drivers/pinctrl/rockchip/pinctrl-rk3588.c:rk3588_set_mux()`
-    // pub fn set_mux(&self, pin: PinId, function: Function) -> PinctrlResult<()> {
-    //     use crate::variants::rk3588::pinctrl::iomux::calc_iomux_config;
-
-    //     let (config, extra_config) =
-    //         calc_iomux_config(pin).ok_or(PinctrlError::InvalidPinId(pin.raw()))?;
-
-    //     // Rockchip 写掩码机制：高16位清除，低16位设置
-    //     // 每个引脚占 4 位，掩码为 0xf
-    //     let mask = 0xfu32 << config.bit_offset;
-    //     let value = function.num() << config.bit_offset;
-
-    //     unsafe {
-    //         let reg_ptr = self.ioc_base.as_ptr().add(config.reg_offset) as *mut u32;
-    //         reg_ptr.write_volatile((mask << 16) | value);
-    //     }
-
-    //     // 如果需要双寄存器配置（GPIO0 的某些引脚）
-    //     if let Some(extra) = extra_config {
-    //         let mask = 0xfu32 << extra.bit_offset;
-    //         let value = function.num() << extra.bit_offset;
-
-    //         unsafe {
-    //             let reg_ptr = self.ioc_base.as_ptr().add(extra.reg_offset) as *mut u32;
-    //             reg_ptr.write_volatile((mask << 16) | value);
-    //         }
-    //     }
-
-    //     Ok(())
-    // }
-
     /// 设置引脚功能（pinmux）
     ///
     /// 配置引脚的复用功能（GPIO、UART、SPI 等）。
@@ -272,15 +230,12 @@ impl Pinctrl {
             // GPIO1-4: 加上 BUS_IOC 基地址
             reg += IocBase::Bus.offset();
         }
-
+        let reg_ptr = unsafe { self.ioc_base.as_ptr().add(reg) as *const u32 };
         // 读取寄存器值
-        let reg_value = unsafe {
-            let reg_ptr = self.ioc_base.as_ptr().add(reg) as *const u32;
-            reg_ptr.read_volatile()
-        };
+        let reg_value = unsafe { reg_ptr.read_volatile() };
 
         debug!(
-            "get_mux: pin={id}, reg_offset={:#x}, bit={}, reg_value={:#x}",
+            "get_mux: pin={id}, reg: {reg_ptr:#p} reg_offset={:#x}, bit={}, reg_value={:#x}",
             reg, bit, reg_value
         );
 

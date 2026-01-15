@@ -3,7 +3,7 @@ use crate::{GpioDirection, Mmio, PinId, PinctrlResult, pinctrl::Iomux, pinctrl::
 mod reg;
 
 use reg::*;
-use tock_registers::interfaces::{Readable, Writeable};
+use tock_registers::interfaces::{ReadWriteable, Readable, Writeable};
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct IomuxReg {
@@ -112,9 +112,15 @@ impl GpioBank {
     #[inline]
     pub fn set_direction_input(&self, pin: PinId) -> PinctrlResult<()> {
         let pin_in_bank = pin.pin_in_bank();
-        let mask = 1u32 << pin_in_bank;
-        let current = self.reg().swport_ddr.get();
-        self.reg().swport_ddr.set(current & !mask);
+        if pin_in_bank >= 32 {
+            return Err(PinctrlError::InvalidPinId(pin));
+        }
+        set_bit(
+            &self.reg().swport_ddr_l,
+            &self.reg().swport_ddr_h,
+            pin_in_bank,
+            false,
+        );
 
         Ok(())
     }
@@ -132,20 +138,19 @@ impl GpioBank {
             return Err(PinctrlError::InvalidPinId(pin));
         }
 
-        let mask = 1u32 << pin_in_bank;
+        set_bit(
+            &self.reg().swport_dr_l,
+            &self.reg().swport_dr_h,
+            pin_in_bank,
+            value,
+        );
 
-        // 设置初始输出值
-        let current_dr = self.reg().swport_dr.get();
-        let new_dr = if value {
-            current_dr | mask
-        } else {
-            current_dr & !mask
-        };
-        self.reg().swport_dr.set(new_dr);
-
-        // 设置为输出
-        let current_ddr = self.reg().swport_ddr.get();
-        self.reg().swport_ddr.set(current_ddr | mask);
+        set_bit(
+            &self.reg().swport_ddr_l,
+            &self.reg().swport_ddr_h,
+            pin_in_bank,
+            true,
+        );
 
         Ok(())
     }
@@ -160,10 +165,12 @@ impl GpioBank {
         if pin_in_bank >= 32 {
             return Err(PinctrlError::InvalidPinId(pin));
         }
-
-        let mask = 1u32 << pin_in_bank;
-        let value = self.reg().ext_port.get();
-        Ok((value & mask) != 0)
+        let value = read_bit(
+            &self.reg().swport_dr_l,
+            &self.reg().swport_dr_h,
+            pin_in_bank,
+        );
+        Ok(value)
     }
 
     /// 写入引脚值
@@ -180,14 +187,12 @@ impl GpioBank {
             return Err(PinctrlError::InvalidPinId(pin));
         }
 
-        let mask = 1u32 << pin_in_bank;
-        let current = self.reg().swport_dr.get();
-        let new_value = if value {
-            current | mask
-        } else {
-            current & !mask
-        };
-        self.reg().swport_dr.set(new_value);
+        set_bit(
+            &self.reg().swport_dr_l,
+            &self.reg().swport_dr_h,
+            pin_in_bank,
+            value,
+        );
 
         Ok(())
     }
@@ -211,20 +216,53 @@ impl GpioBank {
             return Err(PinctrlError::InvalidPinId(pin));
         }
 
-        let mask = 1u32 << pin_in_bank;
-
-        // 读取方向寄存器
-        let ddr_value = self.reg().swport_ddr.get();
-
-        if (ddr_value & mask) != 0 {
+        if read_bit(
+            &self.reg().swport_ddr_l,
+            &self.reg().swport_ddr_h,
+            pin_in_bank,
+        ) {
             // 输出方向：同时读取输出值
-            let dr_value = self.reg().swport_dr.get();
-            Ok(GpioDirection::Output((dr_value & mask) != 0))
+            let dr_value = read_bit(
+                &self.reg().swport_dr_l,
+                &self.reg().swport_dr_h,
+                pin_in_bank,
+            );
+            Ok(GpioDirection::Output(dr_value))
         } else {
             // 输入方向
             Ok(GpioDirection::Input)
         }
     }
+}
+
+fn read_value(reg_l: &impl Readable<T = u32>, reg_h: &impl Readable<T = u32>) -> u32 {
+    reg_l.get() & 0xffff | (reg_h.get() & 0xffff) << 16
+}
+
+fn write_bit(reg_l: &impl Writeable<T = u32>, reg_h: &impl Writeable<T = u32>, value: u32) {
+    reg_l.set(((value) & 0xFFFF) | 0xFFFF0000);
+    reg_h.set((((value) & 0xFFFF0000) >> 16) | 0xFFFF0000);
+}
+
+fn read_bit(
+    reg_l: &impl Readable<T = u32>,
+    reg_h: &impl Readable<T = u32>,
+    pin_in_bank: u32,
+) -> bool {
+    read_value(reg_l, reg_h) & (1 << pin_in_bank) != 0
+}
+
+fn set_bit<V>(reg_l: &V, reg_h: &V, pin_in_bank: u32, value: bool)
+where
+    V: Readable<T = u32> + Writeable<T = u32>,
+{
+    let mut current = read_value(reg_l, reg_h);
+    if value {
+        current |= 1 << pin_in_bank;
+    } else {
+        current &= !(1 << pin_in_bank);
+    }
+    write_bit(reg_l, reg_h, current);
 }
 
 #[cfg(test)]
