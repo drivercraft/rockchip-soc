@@ -2,7 +2,6 @@ pub(crate) mod cru;
 pub(crate) mod pinctrl;
 mod syscon;
 
-
 pub use cru::clock::*;
 // =============================================================================
 // 公开导出
