@@ -7,7 +7,6 @@ use crate::{
     pinctrl::{Iomux, PinCtrlOp, PinctrlResult, gpio::GpioBank},
 };
 
-mod iomux;
 mod pinconf_regs;
 mod reg;
 
