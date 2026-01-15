@@ -1,6 +1,8 @@
 use core::fmt::Debug;
 
-use crate::{Mmio, ResetRockchip, RstId, clock::ClkId, grf::GrfMmio, rk3588::cru::gate::ClkType};
+use crate::{
+    Mmio, ResetRockchip, RstId, clock::ClkId, grf::GrfMmio, variants::rk3588::cru::gate::ClkType,
+};
 
 pub mod clock;
 mod consts;

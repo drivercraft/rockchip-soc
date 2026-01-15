@@ -10,6 +10,9 @@ mod pinconf;
 pub use id::PinId;
 pub use pinconf::{Iomux, PinConfig, Pull};
 
+use crate::{Mmio, SocType};
+pub(crate) mod gpio;
+
 /// GPIO 方向配置（用于设置方向）
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GpioDirection {
@@ -45,3 +48,39 @@ impl fmt::Display for PinctrlError {
 
 /// Pinctrl 操作 Result 类型
 pub type PinctrlResult<T> = core::result::Result<T, PinctrlError>;
+
+#[enum_dispatch::enum_dispatch]
+pub trait PinCtrlOp {
+    fn set_config(&mut self, config: PinConfig) -> PinctrlResult<()>;
+
+    fn get_config(&self, pin: PinId) -> PinctrlResult<PinConfig>;
+
+    fn gpio_direction(&self, pin: PinId) -> PinctrlResult<GpioDirection>;
+
+    fn set_gpio_direction(&self, pin: PinId, direction: GpioDirection) -> PinctrlResult<()>;
+
+    fn read_gpio(&self, pin: PinId) -> PinctrlResult<bool>;
+
+    /// 写入 GPIO 引脚值
+    ///
+    /// 引脚必须已配置为 GPIO 输出功能。
+    ///
+    /// # 参数
+    ///
+    /// * `pin` - 引脚 ID
+    /// * `value` - 输出值（true = 高电平，false = 低电平）
+    fn write_gpio(&self, pin: PinId, value: bool) -> PinctrlResult<()>;
+}
+
+#[enum_dispatch::enum_dispatch(PinCtrlOp)]
+pub enum PinCtrl {
+    Rk3588(crate::variants::rk3588::PinCtrl),
+}
+
+impl PinCtrl {
+    pub fn new(ty: SocType, ioc: Mmio, gpio: &[Mmio]) -> Self {
+        match ty {
+            SocType::Rk3588 => PinCtrl::Rk3588(crate::variants::rk3588::PinCtrl::new(ioc, gpio)),
+        }
+    }
+}

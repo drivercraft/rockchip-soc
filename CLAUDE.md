@@ -25,7 +25,7 @@ linux: `/home/zhourui/orangepi-build/kernel/orange-pi-6.1-rk35xx`
 
 ## 必须遵守
 
-修改完代码后，确保 `cargo check --test test --target aarch64-unknown-none-softfloatt` 可以通过，
+修改完代码后，确保 `cargo check --test test --target aarch64-unknown-none-softfloat` 可以通过，
 执行 `cargo fmt --all` 保持代码风格一致。
 使用最新版本的依赖库，use context7 查询使用方法。
 使用 `tock-registers` 进行寄存器定义和操作。
@@ -47,7 +47,6 @@ cargo test --lib uart
 
 # 运行集成测试 (需要 ostool 和硬件)
 cargo install ostool
-cargo test --test test --target aarch64-unknown-none-softfloat
 
 # 带 u-boot 的开发板测试
 cargo test --test test --target aarch64-unknown-none-softfloat -- uboot
@@ -112,6 +111,7 @@ src/
 **4. Rockchip 寄存器操作**
 
 使用特殊的写掩码机制:
+
 - 高 16 位: 要清除的位掩码
 - 低 16 位: 要设置的值
 - 方法: `clrsetreg()`, `clrreg()`, `setreg()`
@@ -127,24 +127,29 @@ src/
 `Cru` 结构体是核心时钟管理器,提供:
 
 **初始化和验证** (`src/variants/rk3588/cru/mod.rs:87-217`):
+
 - `init()`: 验证 u-boot 配置的 PLL 和时钟分频
 - 不修改寄存器,仅读取和验证
 
 **时钟控制**:
+
 - `clk_enable(id)`: 使能时钟 (清除门控 bit)
 - `clk_disable(id)`: 禁止时钟 (设置门控 bit)
 - `clk_is_enabled(id)`: 检查时钟状态
 
 **频率管理**:
+
 - `clk_get_rate(id)`: 获取时钟频率
 - `clk_set_rate(id, rate)`: 设置时钟频率
 - 支持的时钟类型: PLL, I2C, UART, SPI, PWM, ADC, MMC, USB, 根时钟
 
 **复位控制**:
+
 - `reset_assert(id)`: 断言复位
 - `reset_deassert(id)`: 解除断言
 
 **外设时钟实现** (`peripheral.rs`):
+
 - I2C: 100/200MHz
 - UART: 可配置频率
 - SPI: 可配置频率
@@ -156,11 +161,13 @@ src/
 ### 时钟门控机制
 
 时钟门控表 (`gate.rs`) 定义每个时钟的:
+
 - 寄存器偏移
 - 位位置
 - 时钟类型 (普通/复合)
 
 查找流程:
+
 1. `find_clk_gate(id)`: 在门控表中查找时钟
 2. `get_gate_reg_offset(gate)`: 计算寄存器偏移
 3. Rockchip 写掩码操作使能/禁止
@@ -168,21 +175,25 @@ src/
 ### PLL 配置
 
 **PLL ID 映射** (`pll.rs`):
+
 - PllId 枚举值从 1 开始,匹配设备树绑定
 - 9 个 PLL: B0PLL, B1PLL, LPLL, CPLL, GPLL, NPLL, V0PLL, AUPLL, PPLL
 
 **PLL 参数**:
+
 - p: 参考分频
 - m: 反馈分频
 - s: 输出分频
 - k: 小数分频 (0-65535)
 
 **频率计算** (`pll.rs:calc_pll_rate`):
+
 ```rust
 rate = ((fin / p) * m + (fin * k) / (p * 65536)) >> s
 ```
 
 **验证方法**:
+
 - `verify_pll_frequency()`: 允许 0.1% 误差
 
 ## 测试策略
@@ -197,6 +208,7 @@ rate = ((fin / p) * m + (fin * k) / (p * 65536)) >> s
 ### 集成测试
 
 `tests/test.rs` 需要裸机环境:
+
 - 使用 `bare-test` 框架
 - 通过 `ostool` 在硬件上运行
 - 测试 EMMC 时钟集成
@@ -204,6 +216,7 @@ rate = ((fin / p) * m + (fin * k) / (p * 65536)) >> s
 ## 文档
 
 详细文档位于 `doc/3588/`:
+
 - `PLL.md`: PLL 配置说明
 - `PLL_ID_MAPPING.md`: ID 映射说明
 - `TEST_REPORT.md`: 测试报告

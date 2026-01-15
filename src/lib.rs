@@ -13,19 +13,20 @@ mod _macros;
 mod grf;
 
 mod clock;
+
 pub(crate) mod pinctrl;
 mod rst;
 mod syscon;
-mod variants;
+pub(crate) mod variants;
 
 use core::ptr::NonNull;
 
-pub use variants::*;
-
 pub use pinctrl::id::*;
-pub use pinctrl::{GpioDirection, PinConfig, PinctrlResult, Pull};
+pub use pinctrl::{GpioDirection, PinConfig, PinCtrl, PinCtrlOp, PinctrlResult, Pull};
 pub type Mmio = NonNull<u8>;
 pub use rst::{ResetRockchip, RstId};
 
-// 导出 RK3588 特定类型
-pub use variants::rk3588::PinManager;
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SocType {
+    Rk3588,
+}

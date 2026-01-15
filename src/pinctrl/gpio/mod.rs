@@ -3,7 +3,7 @@ use crate::{GpioDirection, Mmio, PinId, PinctrlResult, pinctrl::Iomux, pinctrl::
 mod reg;
 
 use reg::*;
-use tock_registers::interfaces::{ReadWriteable, Readable, Writeable};
+use tock_registers::interfaces::{Readable, Writeable};
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct IomuxReg {
@@ -17,37 +17,19 @@ pub struct GpioBank {
 }
 
 impl GpioBank {
-    pub fn new(base: Mmio, _bank_id: usize, iomux: [Iomux; 4]) -> Self {
-        // 存储组内偏移（不包含基地址），由 Pinctrl::set_mux() 根据 bank_id 加上相应的基地址
-        //
-        // 参考 u-boot rockchip_pinctrl_get_soc_data 和 rk3588_set_mux 的实现：
-        // - bank->iomux[iomux_num].offset 存储的是组内偏移
-        // - 在 set_mux 中根据 bank_num 决定是否加上 BUS_IOC 基地址 (0x8000)
-        //
-        // RK3588 硬件特性：
-        // - GPIO0 使用 PMU1_IOC (0x0000)
-        // - GPIO1-4 使用 BUS_IOC (0x8000)
-        // - 4-bit IOMUX，每组占用 8 字节（2 个寄存器 × 4 字节）
-        //
-        // 每个 iomux 组占用 8 字节（2 个寄存器 × 4 字节）
-        let iomux_regs = [
-            IomuxReg {
-                ty: iomux[0],
-                offset: 0x00, // 引脚 0-7，组内偏移
-            },
-            IomuxReg {
-                ty: iomux[1],
-                offset: 0x08, // 引脚 8-15，组内偏移
-            },
-            IomuxReg {
-                ty: iomux[2],
-                offset: 0x10, // 引脚 16-23，组内偏移
-            },
-            IomuxReg {
-                ty: iomux[3],
-                offset: 0x18, // 引脚 24-31，组内偏移
-            },
-        ];
+    pub fn new(base: Mmio, iomux: [Iomux; 4]) -> Self {
+        let iomux_regs: [IomuxReg; 4] = core::array::from_fn(|i| {
+            let ty = iomux[i];
+            let offset = i * if ty.contains(Iomux::WIDTH_4BIT)
+                || ty.contains(Iomux::WIDTH_3BIT)
+                || ty.contains(Iomux::WIDTH_8_2BIT)
+            {
+                8
+            } else {
+                4
+            };
+            IomuxReg { ty, offset }
+        });
 
         GpioBank {
             base: base.as_ptr() as usize,
@@ -274,7 +256,7 @@ mod tests {
         // GPIO0 的 iomux 只存储组内偏移，由 Pinctrl::set_mux() 加上 PMU1_IOC 基地址
         let base = unsafe { Mmio::new_unchecked(0xfd8a0000 as *mut u8) };
         let iomux = [Iomux::WIDTH_4BIT; 4];
-        let bank = GpioBank::new(base, 0, iomux);
+        let bank = GpioBank::new(base, iomux);
 
         // 验证组内偏移（不包含基地址）
         assert_eq!(bank.iomux[0].offset, 0x00);
@@ -288,7 +270,7 @@ mod tests {
         // GPIO1-4 的 iomux 只存储组内偏移，由 Pinctrl::set_mux() 加上 BUS_IOC 基地址 (0x8000)
         let base = unsafe { Mmio::new_unchecked(0xfec20000 as *mut u8) };
         let iomux = [Iomux::WIDTH_4BIT; 4];
-        let bank = GpioBank::new(base, 1, iomux);
+        let bank = GpioBank::new(base, iomux);
 
         // 验证组内偏移（不包含基地址）
         assert_eq!(bank.iomux[0].offset, 0x00);
@@ -302,7 +284,7 @@ mod tests {
         // 验证每个 iomux 组占用 8 字节
         let base = unsafe { Mmio::new_unchecked(0xfec20000 as *mut u8) };
         let iomux = [Iomux::WIDTH_4BIT; 4];
-        let bank = GpioBank::new(base, 1, iomux);
+        let bank = GpioBank::new(base, iomux);
 
         assert_eq!(bank.iomux[1].offset - bank.iomux[0].offset, 0x8);
         assert_eq!(bank.iomux[2].offset - bank.iomux[1].offset, 0x8);

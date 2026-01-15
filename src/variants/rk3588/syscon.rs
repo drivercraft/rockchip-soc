@@ -1,5 +1,6 @@
 //! RK3588 GRF 寄存器定义
 //! 自动从 orangepi5plus.dts 提取
+#![allow(dead_code)]
 
 pub mod grf_mmio {
     define_grf!(
@@ -33,4 +34,41 @@ pub mod grf_mmio {
         VO1_GRF, 0xfd5a8000, 0x100;
         VOP_GRF, 0xfd5a4000, 0x2000;
     );
+}
+
+/// IOC 基地址类型
+#[derive(Debug, Clone, Copy)]
+pub enum IocBase {
+    /// PMU1_IOC (0x0000)
+    Pmu1,
+    /// PMU2_IOC (0x4000)
+    Pmu2,
+    /// BUS_IOC (0x8000)
+    Bus,
+    /// VCCIO1-4_IOC (0x9000)
+    Vccio14,
+    /// VCCIO3-5_IOC (0xA000)
+    Vccio35,
+    /// VCCIO2_IOC (0xB000)
+    Vccio2,
+    /// VCCIO6_IOC (0xC000)
+    Vccio6,
+    /// EMMC_IOC (0xD000)
+    Emmc,
+}
+
+impl IocBase {
+    /// 获取 IOC 基地址偏移
+    pub const fn offset(self) -> usize {
+        match self {
+            Self::Pmu1 => 0x0000,
+            Self::Pmu2 => 0x4000,
+            Self::Bus => 0x8000,
+            Self::Vccio14 => 0x9000,
+            Self::Vccio35 => 0xA000,
+            Self::Vccio2 => 0xB000,
+            Self::Vccio6 => 0xC000,
+            Self::Emmc => 0xD000,
+        }
+    }
 }

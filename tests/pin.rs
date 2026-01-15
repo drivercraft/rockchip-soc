@@ -1,9 +1,8 @@
 use alloc::vec::Vec;
-use core::assert_eq;
 use core::ptr::NonNull;
 use num_align::NumAlign;
-use rockchip_soc::rk3588::PinManager;
-use rockchip_soc::{PinConfig, Pull};
+use rockchip_soc::PinConfig;
+use rockchip_soc::rk3588::PinCtrl;
 
 use bare_test::{
     fdt_parser::Node,
@@ -24,7 +23,7 @@ pub fn test_pin() {
     info!("=== Test Complete ===");
 }
 
-fn read_pinctrl(m: &mut PinManager, pinctrl_node: &str) {
+fn read_pinctrl(m: &mut PinCtrl, pinctrl_node: &str) {
     info!("Reading pinctrl node: {}", pinctrl_node);
     let PlatformInfoKind::DeviceTree(fdt) = &global_val().platform_info;
     let fdt = fdt.get();
@@ -47,12 +46,12 @@ fn read_pinctrl(m: &mut PinManager, pinctrl_node: &str) {
 
     let config = m.get_config(pin_conf.id).expect("Failed to get pin config");
 
-    m.set_config(pin_conf);
+    m.set_config(pin_conf).unwrap();
 
     info!("act config: {:?}", config);
 }
 
-fn find_pinctrl() -> PinManager {
+fn find_pinctrl() -> PinCtrl {
     let PlatformInfoKind::DeviceTree(fdt) = &global_val().platform_info;
     let fdt = fdt.get();
 
@@ -81,7 +80,7 @@ fn find_pinctrl() -> PinManager {
         gpio_banks[idx] = gpio_mmio;
     }
 
-    PinManager::new(ioc, gpio_banks)
+    PinCtrl::new(ioc, gpio_banks)
 }
 
 pub fn get_grf(node: &Node, name: &str) -> NonNull<u8> {

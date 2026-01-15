@@ -132,6 +132,7 @@ const PULL_REGS: &[PullEntry] = &[
 ];
 
 // 从 u-boot rk3588_smt_regs[] 提取
+#[allow(dead_code)]
 const SCHMITT_REGS: &[SchmittEntry] = &[
     // GPIO0
     SchmittEntry::new(GPIO0_A0, 0x0030), // GPIO0_A0
@@ -249,6 +250,7 @@ pub fn find_pull_entry(pin: PinId) -> Option<(usize, u32)> {
 /// # 参考
 ///
 /// u-boot: `drivers/pinctrl/rockchip/pinctrl-rk3588.c:rk3588_calc_schmitt_reg_and_bit`
+#[allow(dead_code)]
 pub fn find_schmitt_entry(pin: PinId) -> Option<(usize, u32)> {
     let pin_num = pin.raw();
 

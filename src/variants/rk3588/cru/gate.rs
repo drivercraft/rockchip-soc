@@ -10,10 +10,9 @@
 //! 使能时钟：清除对应的 bit
 //! 禁止时钟：设置对应的 bit
 
-use super::Cru;
 use super::consts::*;
+use super::*;
 use crate::clock::ClkId;
-use crate::rk3588::cru::*;
 
 #[derive(Debug, Clone, Copy)]
 pub enum ClkType {

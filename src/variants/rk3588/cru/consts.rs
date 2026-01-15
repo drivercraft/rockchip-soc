@@ -8,7 +8,7 @@
 // 频率常量
 // ============================================================================
 
-pub(crate) use crate::MHZ;
+pub(crate) use crate::variants::MHZ;
 
 pub const KHZ: u32 = 1_000;
 pub const OSC_HZ: u64 = 24 * MHZ;

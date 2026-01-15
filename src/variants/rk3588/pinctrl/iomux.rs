@@ -2,42 +2,7 @@
 //!
 //! RK3588 的引脚复用配置是规则分布的，使用算法计算而非静态表。
 
-/// IOC 基地址类型
-#[derive(Debug, Clone, Copy)]
-pub enum IocBase {
-    /// PMU1_IOC (0x0000)
-    Pmu1,
-    /// PMU2_IOC (0x4000)
-    Pmu2,
-    /// BUS_IOC (0x8000)
-    Bus,
-    /// VCCIO1-4_IOC (0x9000)
-    Vccio14,
-    /// VCCIO3-5_IOC (0xA000)
-    Vccio35,
-    /// VCCIO2_IOC (0xB000)
-    Vccio2,
-    /// VCCIO6_IOC (0xC000)
-    Vccio6,
-    /// EMMC_IOC (0xD000)
-    Emmc,
-}
 
-impl IocBase {
-    /// 获取 IOC 基地址偏移
-    pub const fn offset(self) -> usize {
-        match self {
-            Self::Pmu1 => 0x0000,
-            Self::Pmu2 => 0x4000,
-            Self::Bus => 0x8000,
-            Self::Vccio14 => 0x9000,
-            Self::Vccio35 => 0xA000,
-            Self::Vccio2 => 0xB000,
-            Self::Vccio6 => 0xC000,
-            Self::Emmc => 0xD000,
-        }
-    }
-}
 
 #[cfg(test)]
 mod tests {

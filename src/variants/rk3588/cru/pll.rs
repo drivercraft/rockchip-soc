@@ -2,13 +2,8 @@
 //!
 //! 参考 u-boot-orangepi/drivers/clk/rockchip/clk_rk3588.c
 
-use crate::{
-    clock::{ClkId, pll::*},
-    rk3588::{
-        Cru,
-        cru::{ClockError, ClockResult, consts::*},
-    },
-};
+use super::{ClockError, ClockResult, Cru, consts::*};
+use crate::clock::{ClkId, pll::*};
 
 /// PLL 模式掩码
 const PLL_MODE_MASK: u32 = 0x3;

@@ -4,9 +4,10 @@
 
 use alloc::vec::Vec;
 
-use super::Cru;
+use super::clock::*;
+use super::consts::*;
 use super::error::{ClockError, ClockResult};
-use crate::{clock::ClkId, rk3588::cru::clock::*, rk3588::cru::consts::*};
+use super::*;
 
 impl Cru {
     // ========================================================================
@@ -424,10 +425,10 @@ impl Cru {
                 static PARENTS: [u64; 3] = [0, 0, 24 * MHZ];
                 (
                     77,
-                    crate::rk3588::cru::clk_sel77::CCLK_EMMC_SEL_SHIFT,
-                    crate::rk3588::cru::clk_sel77::CCLK_EMMC_SEL_MASK,
-                    crate::rk3588::cru::clk_sel77::CCLK_EMMC_DIV_SHIFT,
-                    crate::rk3588::cru::clk_sel77::CCLK_EMMC_DIV_MASK,
+                    clk_sel77::CCLK_EMMC_SEL_SHIFT,
+                    clk_sel77::CCLK_EMMC_SEL_MASK,
+                    clk_sel77::CCLK_EMMC_DIV_SHIFT,
+                    clk_sel77::CCLK_EMMC_DIV_MASK,
                     &PARENTS, // 稍后填充实际值
                 )
             }
@@ -436,10 +437,10 @@ impl Cru {
                 static PARENTS: [u64; 2] = [0, 0];
                 (
                     78,
-                    crate::rk3588::cru::clk_sel78::BCLK_EMMC_SEL_SHIFT,
-                    crate::rk3588::cru::clk_sel78::BCLK_EMMC_SEL_MASK,
-                    crate::rk3588::cru::clk_sel78::BCLK_EMMC_DIV_SHIFT,
-                    crate::rk3588::cru::clk_sel78::BCLK_EMMC_DIV_MASK,
+                    clk_sel78::BCLK_EMMC_SEL_SHIFT,
+                    clk_sel78::BCLK_EMMC_SEL_MASK,
+                    clk_sel78::BCLK_EMMC_DIV_SHIFT,
+                    clk_sel78::BCLK_EMMC_DIV_MASK,
                     &PARENTS, // 稍后填充实际值
                 )
             }
@@ -448,10 +449,10 @@ impl Cru {
                 static PARENTS: [u64; 3] = [0, 0, 24 * MHZ];
                 (
                     172,
-                    crate::rk3588::cru::clk_sel172::CCLK_SDIO_SRC_SEL_SHIFT,
-                    crate::rk3588::cru::clk_sel172::CCLK_SDIO_SRC_SEL_MASK,
-                    crate::rk3588::cru::clk_sel172::CCLK_SDIO_SRC_DIV_SHIFT,
-                    crate::rk3588::cru::clk_sel172::CCLK_SDIO_SRC_DIV_MASK,
+                    clk_sel172::CCLK_SDIO_SRC_SEL_SHIFT,
+                    clk_sel172::CCLK_SDIO_SRC_SEL_MASK,
+                    clk_sel172::CCLK_SDIO_SRC_DIV_SHIFT,
+                    clk_sel172::CCLK_SDIO_SRC_DIV_MASK,
                     &PARENTS, // 稍后填充实际值
                 )
             }
@@ -460,10 +461,10 @@ impl Cru {
                 static PARENTS: [u64; 3] = [0, 0, 24 * MHZ];
                 (
                     78,
-                    crate::rk3588::cru::clk_sel78::SCLK_SFC_SEL_SHIFT,
-                    crate::rk3588::cru::clk_sel78::SCLK_SFC_SEL_MASK,
-                    crate::rk3588::cru::clk_sel78::SCLK_SFC_DIV_SHIFT,
-                    crate::rk3588::cru::clk_sel78::SCLK_SFC_DIV_MASK,
+                    clk_sel78::SCLK_SFC_SEL_SHIFT,
+                    clk_sel78::SCLK_SFC_SEL_MASK,
+                    clk_sel78::SCLK_SFC_DIV_SHIFT,
+                    clk_sel78::SCLK_SFC_DIV_MASK,
                     &PARENTS, // 稍后填充实际值
                 )
             }
@@ -537,66 +538,63 @@ impl Cru {
             ClkId::CCLK_EMMC => {
                 // CLKSEL_CON(77): sel[14:15], div[8:13]
                 static SOURCES: [(u64, u32); 3] = [
-                    (0, crate::rk3588::cru::clk_sel77::CCLK_EMMC_SEL_GPLL),
-                    (0, crate::rk3588::cru::clk_sel77::CCLK_EMMC_SEL_CPLL),
-                    (24 * MHZ, crate::rk3588::cru::clk_sel77::CCLK_EMMC_SEL_24M),
+                    (0, clk_sel77::CCLK_EMMC_SEL_GPLL),
+                    (0, clk_sel77::CCLK_EMMC_SEL_CPLL),
+                    (24 * MHZ, clk_sel77::CCLK_EMMC_SEL_24M),
                 ];
                 (
                     77,
-                    crate::rk3588::cru::clk_sel77::CCLK_EMMC_SEL_SHIFT,
-                    crate::rk3588::cru::clk_sel77::CCLK_EMMC_SEL_MASK,
-                    crate::rk3588::cru::clk_sel77::CCLK_EMMC_DIV_SHIFT,
-                    crate::rk3588::cru::clk_sel77::CCLK_EMMC_DIV_MASK,
+                    clk_sel77::CCLK_EMMC_SEL_SHIFT,
+                    clk_sel77::CCLK_EMMC_SEL_MASK,
+                    clk_sel77::CCLK_EMMC_DIV_SHIFT,
+                    clk_sel77::CCLK_EMMC_DIV_MASK,
                     &SOURCES, // 稍后填充实际值
                 )
             }
             ClkId::BCLK_EMMC => {
                 // CLKSEL_CON(78): sel[5], div[0:4]
                 static SOURCES: [(u64, u32); 2] = [
-                    (0, crate::rk3588::cru::clk_sel78::BCLK_EMMC_SEL_GPLL),
-                    (0, crate::rk3588::cru::clk_sel78::BCLK_EMMC_SEL_CPLL),
+                    (0, clk_sel78::BCLK_EMMC_SEL_GPLL),
+                    (0, clk_sel78::BCLK_EMMC_SEL_CPLL),
                 ];
                 (
                     78,
-                    crate::rk3588::cru::clk_sel78::BCLK_EMMC_SEL_SHIFT,
-                    crate::rk3588::cru::clk_sel78::BCLK_EMMC_SEL_MASK,
-                    crate::rk3588::cru::clk_sel78::BCLK_EMMC_DIV_SHIFT,
-                    crate::rk3588::cru::clk_sel78::BCLK_EMMC_DIV_MASK,
+                    clk_sel78::BCLK_EMMC_SEL_SHIFT,
+                    clk_sel78::BCLK_EMMC_SEL_MASK,
+                    clk_sel78::BCLK_EMMC_DIV_SHIFT,
+                    clk_sel78::BCLK_EMMC_DIV_MASK,
                     &SOURCES, // 稍后填充实际值
                 )
             }
             ClkId::CCLK_SRC_SDIO => {
                 // CLKSEL_CON(172): sel[8:9], div[2:7]
                 static SOURCES: [(u64, u32); 3] = [
-                    (0, crate::rk3588::cru::clk_sel172::CCLK_SDIO_SRC_SEL_GPLL),
-                    (0, crate::rk3588::cru::clk_sel172::CCLK_SDIO_SRC_SEL_CPLL),
-                    (
-                        24 * MHZ,
-                        crate::rk3588::cru::clk_sel172::CCLK_SDIO_SRC_SEL_24M,
-                    ),
+                    (0, clk_sel172::CCLK_SDIO_SRC_SEL_GPLL),
+                    (0, clk_sel172::CCLK_SDIO_SRC_SEL_CPLL),
+                    (24 * MHZ, clk_sel172::CCLK_SDIO_SRC_SEL_24M),
                 ];
                 (
                     172,
-                    crate::rk3588::cru::clk_sel172::CCLK_SDIO_SRC_SEL_SHIFT,
-                    crate::rk3588::cru::clk_sel172::CCLK_SDIO_SRC_SEL_MASK,
-                    crate::rk3588::cru::clk_sel172::CCLK_SDIO_SRC_DIV_SHIFT,
-                    crate::rk3588::cru::clk_sel172::CCLK_SDIO_SRC_DIV_MASK,
+                    clk_sel172::CCLK_SDIO_SRC_SEL_SHIFT,
+                    clk_sel172::CCLK_SDIO_SRC_SEL_MASK,
+                    clk_sel172::CCLK_SDIO_SRC_DIV_SHIFT,
+                    clk_sel172::CCLK_SDIO_SRC_DIV_MASK,
                     &SOURCES, // 稍后填充实际值
                 )
             }
             ClkId::SCLK_SFC => {
                 // CLKSEL_CON(78): sel[12:13], div[6:11]
                 static SOURCES: [(u64, u32); 3] = [
-                    (0, crate::rk3588::cru::clk_sel78::SCLK_SFC_SEL_GPLL),
-                    (0, crate::rk3588::cru::clk_sel78::SCLK_SFC_SEL_CPLL),
-                    (24 * MHZ, crate::rk3588::cru::clk_sel78::SCLK_SFC_SEL_24M),
+                    (0, clk_sel78::SCLK_SFC_SEL_GPLL),
+                    (0, clk_sel78::SCLK_SFC_SEL_CPLL),
+                    (24 * MHZ, clk_sel78::SCLK_SFC_SEL_24M),
                 ];
                 (
                     78,
-                    crate::rk3588::cru::clk_sel78::SCLK_SFC_SEL_SHIFT,
-                    crate::rk3588::cru::clk_sel78::SCLK_SFC_SEL_MASK,
-                    crate::rk3588::cru::clk_sel78::SCLK_SFC_DIV_SHIFT,
-                    crate::rk3588::cru::clk_sel78::SCLK_SFC_DIV_MASK,
+                    clk_sel78::SCLK_SFC_SEL_SHIFT,
+                    clk_sel78::SCLK_SFC_SEL_MASK,
+                    clk_sel78::SCLK_SFC_DIV_SHIFT,
+                    clk_sel78::SCLK_SFC_DIV_MASK,
                     &SOURCES, // 稍后填充实际值
                 )
             }
@@ -681,7 +679,7 @@ impl Cru {
     /// 如果时钟 ID 不支持或寄存器读取失败，返回错误
     pub(crate) fn usb_get_rate(&self, id: ClkId) -> ClockResult<u64> {
         // 导入 USB clock ID 常量
-        use crate::rk3588::cru::clock::{ACLK_USB_ROOT, CLK_UTMI_OTG2, HCLK_USB_ROOT};
+        use clock::{ACLK_USB_ROOT, CLK_UTMI_OTG2, HCLK_USB_ROOT};
 
         // USB 时钟源常量
         const CLK_150M: u64 = 150 * MHZ;
@@ -702,10 +700,10 @@ impl Cru {
                 static PARENTS: [u64; 2] = [0, 0];
                 (
                     96,
-                    crate::rk3588::cru::clk_sel96::ACLK_USB_ROOT_SEL_SHIFT,
-                    crate::rk3588::cru::clk_sel96::ACLK_USB_ROOT_SEL_MASK,
-                    crate::rk3588::cru::clk_sel96::ACLK_USB_ROOT_DIV_SHIFT,
-                    crate::rk3588::cru::clk_sel96::ACLK_USB_ROOT_DIV_MASK,
+                    clk_sel96::ACLK_USB_ROOT_SEL_SHIFT,
+                    clk_sel96::ACLK_USB_ROOT_SEL_MASK,
+                    clk_sel96::ACLK_USB_ROOT_DIV_SHIFT,
+                    clk_sel96::ACLK_USB_ROOT_DIV_MASK,
                     &PARENTS,
                 )
             }
@@ -714,8 +712,8 @@ impl Cru {
                 static PARENTS: [u64; 4] = [CLK_150M, CLK_100M, CLK_50M, 24 * MHZ];
                 (
                     96,
-                    crate::rk3588::cru::clk_sel96::HCLK_USB_ROOT_SEL_SHIFT,
-                    crate::rk3588::cru::clk_sel96::HCLK_USB_ROOT_SEL_MASK,
+                    clk_sel96::HCLK_USB_ROOT_SEL_SHIFT,
+                    clk_sel96::HCLK_USB_ROOT_SEL_MASK,
                     0, // 无 div
                     0, // 无 div
                     &PARENTS,
@@ -726,10 +724,10 @@ impl Cru {
                 static PARENTS: [u64; 3] = [CLK_150M, CLK_50M, 24 * MHZ];
                 (
                     84,
-                    crate::rk3588::cru::clk_sel84::CLK_UTMI_OTG2_SEL_SHIFT,
-                    crate::rk3588::cru::clk_sel84::CLK_UTMI_OTG2_SEL_MASK,
-                    crate::rk3588::cru::clk_sel84::CLK_UTMI_OTG2_DIV_SHIFT,
-                    crate::rk3588::cru::clk_sel84::CLK_UTMI_OTG2_DIV_MASK,
+                    clk_sel84::CLK_UTMI_OTG2_SEL_SHIFT,
+                    clk_sel84::CLK_UTMI_OTG2_SEL_MASK,
+                    clk_sel84::CLK_UTMI_OTG2_DIV_SHIFT,
+                    clk_sel84::CLK_UTMI_OTG2_DIV_MASK,
                     &PARENTS,
                 )
             }
@@ -784,7 +782,7 @@ impl Cru {
     /// 如果时钟 ID 不支持或寄存器写入失败，返回错误
     pub(crate) fn usb_set_rate(&mut self, id: ClkId, rate_hz: u64) -> ClockResult<u64> {
         // 导入 USB clock ID 常量
-        use crate::rk3588::cru::clock::{ACLK_USB_ROOT, CLK_UTMI_OTG2, HCLK_USB_ROOT};
+        use clock::{ACLK_USB_ROOT, CLK_UTMI_OTG2, HCLK_USB_ROOT};
 
         const CLK_150M: u64 = 150 * MHZ;
         const CLK_50M: u64 = 50 * MHZ;
@@ -805,39 +803,30 @@ impl Cru {
         ) = match id {
             ACLK_USB_ROOT => {
                 static SOURCES: [(u64, u32); 2] = [
-                    (0, crate::rk3588::cru::clk_sel96::ACLK_USB_ROOT_SEL_GPLL),
-                    (0, crate::rk3588::cru::clk_sel96::ACLK_USB_ROOT_SEL_CPLL),
+                    (0, clk_sel96::ACLK_USB_ROOT_SEL_GPLL),
+                    (0, clk_sel96::ACLK_USB_ROOT_SEL_CPLL),
                 ];
                 (
                     96,
-                    crate::rk3588::cru::clk_sel96::ACLK_USB_ROOT_SEL_SHIFT,
-                    crate::rk3588::cru::clk_sel96::ACLK_USB_ROOT_SEL_MASK,
-                    crate::rk3588::cru::clk_sel96::ACLK_USB_ROOT_DIV_SHIFT,
-                    crate::rk3588::cru::clk_sel96::ACLK_USB_ROOT_DIV_MASK,
+                    clk_sel96::ACLK_USB_ROOT_SEL_SHIFT,
+                    clk_sel96::ACLK_USB_ROOT_SEL_MASK,
+                    clk_sel96::ACLK_USB_ROOT_DIV_SHIFT,
+                    clk_sel96::ACLK_USB_ROOT_DIV_MASK,
                     &SOURCES,
                 )
             }
             CLK_UTMI_OTG2 => {
                 static SOURCES: [(u64, u32); 3] = [
-                    (
-                        CLK_150M,
-                        crate::rk3588::cru::clk_sel84::CLK_UTMI_OTG2_SEL_150M,
-                    ),
-                    (
-                        CLK_50M,
-                        crate::rk3588::cru::clk_sel84::CLK_UTMI_OTG2_SEL_50M,
-                    ),
-                    (
-                        24 * MHZ,
-                        crate::rk3588::cru::clk_sel84::CLK_UTMI_OTG2_SEL_24M,
-                    ),
+                    (CLK_150M, clk_sel84::CLK_UTMI_OTG2_SEL_150M),
+                    (CLK_50M, clk_sel84::CLK_UTMI_OTG2_SEL_50M),
+                    (24 * MHZ, clk_sel84::CLK_UTMI_OTG2_SEL_24M),
                 ];
                 (
                     84,
-                    crate::rk3588::cru::clk_sel84::CLK_UTMI_OTG2_SEL_SHIFT,
-                    crate::rk3588::cru::clk_sel84::CLK_UTMI_OTG2_SEL_MASK,
-                    crate::rk3588::cru::clk_sel84::CLK_UTMI_OTG2_DIV_SHIFT,
-                    crate::rk3588::cru::clk_sel84::CLK_UTMI_OTG2_DIV_MASK,
+                    clk_sel84::CLK_UTMI_OTG2_SEL_SHIFT,
+                    clk_sel84::CLK_UTMI_OTG2_SEL_MASK,
+                    clk_sel84::CLK_UTMI_OTG2_DIV_SHIFT,
+                    clk_sel84::CLK_UTMI_OTG2_DIV_MASK,
                     &SOURCES,
                 )
             }

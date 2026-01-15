@@ -11,6 +11,7 @@ thiserror = {version = "2", default-features = false}
 tock-registers = "0.10"
 fdt-edit = "0.1"
 bitflags = "2"
+enum_dispatch = "0.3.13"
 
 [target.'cfg(not(any(windows, unix)))'.dev-dependencies]
 bare-test = "0.7"
